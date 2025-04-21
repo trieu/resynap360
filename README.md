@@ -14,31 +14,36 @@ Việc **hợp nhất dữ liệu khách hàng từ nhiều nguồn thành một
 Dưới đây là **5 lý do cấp thiết** vì sao doanh nghiệp nên ưu tiên thực hiện điều này càng sớm càng tốt:
 
 ### 1. **Tạo góc nhìn 360° về khách hàng**
-> Không thể phục vụ đúng người nếu không hiểu họ thực sự là ai.
+
+- Không thể phục vụ đúng người nếu không hiểu họ thực sự là ai.
 - Khi dữ liệu từ web, app, CRM, email, social, offline... được hợp nhất, bạn có một cái nhìn toàn diện về hành vi, nhu cầu, giá trị vòng đời (CLV) và lịch sử tương tác của mỗi khách hàng.
 - Đây là nền tảng để phân khúc sâu hơn, đưa ra dự đoán hành vi, và xây dựng chiến lược cá nhân hóa có tác động thực sự.
 
 ### 2. **Tăng độ chính xác trong phân tích và dự đoán**
-> Garbage in = Garbage out. Dữ liệu sai sẽ làm hỏng mọi mô hình.
+
+- Garbage in = Garbage out. Dữ liệu sai sẽ làm hỏng mọi mô hình.
 - Nếu dữ liệu khách hàng bị phân mảnh hoặc trùng lặp, mọi phân tích – từ marketing attribution đến mô hình AI – đều bị sai lệch.
 - CIR làm sạch và thống nhất dữ liệu đầu vào, giúp các thuật toán và dashboard phản ánh đúng thực tế.
 
 ### 3. **Tối ưu hiệu suất marketing và ngân sách**
-> Bắn đúng người = ít tốn tiền, hiệu quả cao.
+- Gửi thông tin content và product đúng người = ít tốn tiền, hiệu quả cao.
 - Khi biết rõ ai là ai, bạn tránh việc gửi trùng thông điệp, chạy quảng cáo lặp lại, hoặc remarketing sai người.
 - CIR giúp tiết kiệm chi phí quảng cáo, tăng ROI chiến dịch và giảm churn thông qua các tương tác đúng thời điểm.
 
 ### 4. **Hỗ trợ trải nghiệm khách hàng liền mạch (Omni-channel CX)**
-> Khách hàng kỳ vọng bạn "nhớ họ" dù tương tác ở bất kỳ kênh nào.
+
+- Khách hàng kỳ vọng bạn "nhớ họ" dù tương tác ở bất kỳ kênh nào.
 - CIR giúp đảm bảo rằng mọi bộ phận – từ CSKH đến marketing – đều nhìn thấy cùng một thông tin khách hàng, ở mọi điểm chạm (touchpoint).
 - Điều này tạo nên trải nghiệm mượt mà, nhất quán và tăng độ hài lòng khách hàng.
 
 ### 5. **Tuân thủ pháp lý và bảo mật dữ liệu**
-> Không chỉ là hiệu quả, mà còn là sống còn.
+
+- Không chỉ là hiệu quả, mà còn là sống còn.
 - Các quy định như GDPR, CCPA yêu cầu bạn phải biết rõ bạn lưu trữ thông tin gì, ở đâu, và ai có quyền truy cập.
 - CIR giúp gom dữ liệu về một nơi, dễ dàng thực hiện các quyền của khách hàng như "xóa", "sửa", hay "yêu cầu truy cập".
 
 ### 👉 Bottom line:
+
 **Nếu không làm CIR, bạn đang ra quyết định dựa trên bức tranh mờ nhòe về khách hàng.**  
 Không có CIR, mọi nỗ lực AI/ML/CDP/Personalization chỉ là “dựng lâu đài trên cát”.
 
