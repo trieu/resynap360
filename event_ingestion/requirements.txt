@@ -1,0 +1,4 @@
+psycopg2-binary
+phonenumbers
+python-dotenv
+kafka-python
