@@ -17,8 +17,8 @@ Các bước thiết lập hạ tầng ban đầu bao gồm:
     * Cấu hình nguồn dữ liệu (ví dụ: Direct PUT, Kinesis Data Streams).
     * Chọn đích là "Amazon RDS".
     * Cấu hình kết nối đến instance RDS PostgreSQL đã tạo (endpoint, port, tên DB, user/password - nên sử dụng AWS Secrets Manager).
-    * Chỉ định bảng đích ban đầu cho dữ liệu thô (`raw_profiles_stage`).
-    * Cấu hình ánh xạ dữ liệu từ dữ liệu nguồn (ví dụ: JSON) sang các cột của bảng `raw_profiles_stage`.
+    * Chỉ định bảng đích ban đầu cho dữ liệu thô (`cdp_raw_profiles_stage`).
+    * Cấu hình ánh xạ dữ liệu từ dữ liệu nguồn (ví dụ: JSON) sang các cột của bảng `cdp_raw_profiles_stage`.
     * Cấu hình xử lý lỗi và lưu trữ bản sao lưu vào S3.
     * Đảm bảo cấu hình mạng (VPC, Security Groups) cho phép Firehose kết nối đến RDS.
 3.  **Thiết lập Môi trường Lịch Trình Hàng Ngày:**
@@ -34,13 +34,13 @@ Giải pháp bao gồm các thành phần chính sau:
 
 * **AWS Kinesis Data Firehose:** Dịch vụ ingestion dữ liệu stream, đẩy dữ liệu thô vào bảng staging trong RDS.
 * **AWS RDS for PostgreSQL 16:** Cơ sở dữ liệu trung tâm, lưu trữ dữ liệu, metadata và thực thi logic xử lý.
-    * **Bảng Staging (`raw_profiles_stage`):** Nơi dữ liệu thô từ Firehose được ghi vào.
-    * **Bảng Metadata (`profile_attributes`):** Định nghĩa cấu trúc và thuộc tính của các trường dữ liệu profile, bao gồm cả cấu hình cho nhận dạng danh tính (thuộc tính nào dùng để ghép nối, quy tắc ghép nối, cách tổng hợp dữ liệu).
-    * **Bảng Master Profiles (`master_profiles`):** Lưu trữ các hồ sơ khách hàng "vàng" đã được giải quyết.
-    * **Bảng Profile Links (`profile_links`):** Lưu trữ mối quan hệ liên kết giữa các bản ghi thô và hồ sơ master.
-    * **Stored Procedure (`resolve_customer_identities_dynamic`):** Chứa toàn bộ logic nhận dạng danh tính, đọc cấu hình từ `profile_attributes` và xử lý dữ liệu trong bảng staging.
+    * **Bảng Staging (`cdp_raw_profiles_stage`):** Nơi dữ liệu thô từ Firehose được ghi vào.
+    * **Bảng Metadata (`cdp_profile_attributes`):** Định nghĩa cấu trúc và thuộc tính của các trường dữ liệu profile, bao gồm cả cấu hình cho nhận dạng danh tính (thuộc tính nào dùng để ghép nối, quy tắc ghép nối, cách tổng hợp dữ liệu).
+    * **Bảng Master Profiles (`cdp_master_profiles`):** Lưu trữ các hồ sơ khách hàng "vàng" đã được giải quyết.
+    * **Bảng Profile Links (`cdp_profile_links`):** Lưu trữ mối quan hệ liên kết giữa các bản ghi thô và hồ sơ master.
+    * **Stored Procedure (`resolve_customer_identities_dynamic`):** Chứa toàn bộ logic nhận dạng danh tính, đọc cấu hình từ `cdp_profile_attributes` và xử lý dữ liệu trong bảng staging.
     * **Extensions:** `citext`, `fuzzystrmatch`, `pg_trgm` hỗ trợ so sánh chuỗi và fuzzy matching.
-* **Real-time Trigger (`trigger_process_new_raw_profiles`):** Một trigger trên bảng `raw_profiles_stage` để kích hoạt xử lý ngay khi có dữ liệu mới đến.
+* **Real-time Trigger (`cdp_trigger_process_new_raw_profiles`):** Một trigger trên bảng `cdp_raw_profiles_stage` để kích hoạt xử lý ngay khi có dữ liệu mới đến.
 * **Trigger Function (`process_new_raw_profiles_trigger_func`):** Hàm được gọi bởi real-time trigger, có nhiệm vụ gọi stored procedure chính.
 * **Lịch Trình Hàng Ngày (External Scheduler):** Một quy trình bên ngoài (ví dụ: script Python) được lên lịch chạy định kỳ để đảm bảo quét toàn bộ bảng staging và quản lý trạng thái của real-time trigger.
 
@@ -57,9 +57,9 @@ graph TD
 
     subgraph "Cơ Chế  Trigger"
         direction TB
-        T{{Real-time Trigger<br>trigger_process_new_raw_profiles}}
+        T{{Real-time Trigger<br>cdp_trigger_process_new_raw_profiles}}
         S["Lịch Trình Hàng Ngày<br>(Python/Lambda)"]
-        Status["Bảng IR Status<br>identity_resolution_status"] 
+        Status["Bảng IR Status<br>cdp_id_resolution_status"] 
     end
 
     C -- "AFTER INSERT/UPDATE" --> T
@@ -113,6 +113,8 @@ graph TD
 
 Phần này cung cấp các lệnh SQL để tạo cấu trúc cơ sở dữ liệu cần thiết.
 
+### Extension 
+
 ```sql
 -- Cài đặt các Extension cần thiết cho Fuzzy Matching
 CREATE EXTENSION IF NOT EXISTS citext; -- Cho so sánh không phân biệt chữ hoa chữ thường
@@ -120,33 +122,37 @@ CREATE EXTENSION IF NOT EXISTS fuzzystrmatch; -- Cho soundex, dmetaphone, levens
 CREATE EXTENSION IF NOT EXISTS pg_trgm; -- Cho similarity based on trigrams
 ```
 
+### Tables for meta-data
 
 ```sql
 -- Bảng Metadata: attribute_type (Placeholder - cần định nghĩa chi tiết nếu sử dụng FK)
 -- Bảng này định nghĩa các loại control UI hoặc kiểu attribute chung.
-CREATE TABLE IF NOT EXISTS attribute_type (
+
+-- Bảng Metadata: attribute_type (Placeholder - cần định nghĩa chi tiết nếu sử dụng FK)
+-- Bảng này định nghĩa các loại control UI hoặc kiểu attribute chung.
+CREATE TABLE IF NOT EXISTS cdp_attribute_type (
     id SERIAL PRIMARY KEY,
     type_name VARCHAR(100) UNIQUE NOT NULL
 );
 
 -- Bảng Metadata: objects (Placeholder - cần định nghĩa chi tiết nếu sử dụng FK)
 -- Bảng này định nghĩa các loại đối tượng chính (ví dụ: Customer, Product).
-CREATE TABLE IF NOT EXISTS objects (
+CREATE TABLE IF NOT EXISTS cdp_objects (
     id SERIAL PRIMARY KEY,
     object_name VARCHAR(100) UNIQUE NOT NULL
 );
 
--- Bảng Metadata: profile_attributes
+-- Bảng Metadata: cdp_profile_attributes
 -- Bảng này định nghĩa *meta-data* cho từng thuộc tính (attribute) của profile.
 -- Đã thêm các cột giả định cho cấu hình ghép nối và tổng hợp dữ liệu.
-CREATE TABLE profile_attributes (
+CREATE TABLE cdp_profile_attributes (
     id BIGSERIAL PRIMARY KEY,
     attribute_internal_code VARCHAR(100) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     status VARCHAR(50) DEFAULT 'ACTIVE', -- vd: 'ACTIVE', 'INACTIVE', 'DELETED'
-    attribute_type_id INT NULL REFERENCES attribute_type(id), -- FK đến bảng attribute_type
+    attribute_type_id INT NULL REFERENCES cdp_attribute_type(id), -- FK đến bảng attribute_type
     data_type VARCHAR(50) NOT NULL, -- vd: 'VARCHAR', 'INT', 'BOOLEAN', 'DATETIME', 'JSON', 'FLOAT'
-    object_id INT NULL REFERENCES objects(id), -- FK đến bảng objects (vd: 1='Customer')
+    object_id INT NULL REFERENCES cdp_objects(id), -- FK đến bảng cdp_objects (vd: 1='Customer')
     is_required BOOLEAN DEFAULT FALSE,
     
     is_index BOOLEAN DEFAULT FALSE, -- Có nên tạo index cho giá trị của attribute này không?
@@ -154,7 +160,7 @@ CREATE TABLE profile_attributes (
     storage_type VARCHAR(50) NULL, -- Cách lưu trữ giá trị (vd: 'COLUMN', 'JSON_FIELD')
     attribute_size INT NULL, -- Kích thước dữ liệu (vd: max length cho VARCHAR)
     attribute_group VARCHAR(100) NULL, -- Nhóm logic trên UI
-    parent_id BIGINT NULL REFERENCES profile_attributes(id), -- ID của attribute cha (cho cấu trúc lồng)
+    parent_id BIGINT NULL REFERENCES cdp_profile_attributes(id), -- ID của attribute cha (cho cấu trúc lồng)
     option_value JSON NULL, -- Lưu các tùy chọn nếu là dropdown, radio button, etc.
     process_status VARCHAR(50) NULL, -- Trạng thái liên quan đến quy trình xử lý dữ liệu
     attribute_status VARCHAR(50) NULL, -- Trạng thái cụ thể khác
@@ -174,6 +180,8 @@ CREATE TABLE profile_attributes (
 );
 ```
 
+### Trigger
+
 ```sql 
 -- Trigger để tự động cập nhật cột update_at
 CREATE OR REPLACE FUNCTION update_profile_attributes_timestamp()
@@ -187,18 +195,18 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER before_profile_attributes_update
-BEFORE UPDATE ON profile_attributes
+BEFORE UPDATE ON cdp_profile_attributes
 FOR EACH ROW
 EXECUTE FUNCTION update_profile_attributes_timestamp();
 ```
-
+### Tables for raw data
 
 ```sql
--- Bảng 1: raw_profiles_stage
+-- Bảng 1: cdp_raw_profiles_stage
 -- Firehose sẽ đẩy dữ liệu vào bảng này. Lược đồ cần khớp với dữ liệu đầu vào của bạn.
-CREATE TABLE raw_profiles_stage (
+CREATE TABLE cdp_raw_profiles_stage (
     raw_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho mỗi bản ghi thô
-    -- Các cột dữ liệu thô tương ứng với các attribute được định nghĩa trong profile_attributes
+    -- Các cột dữ liệu thô tương ứng với các attribute được định nghĩa trong cdp_profile_attributes
     -- Tên cột ở đây nên khớp với attribute_internal_code nếu storage_type là 'COLUMN'
     first_name VARCHAR(255),
     last_name VARCHAR(255),
@@ -217,16 +225,16 @@ CREATE TABLE raw_profiles_stage (
 -- Tạo Index cho các trường quan trọng dùng cho ghép nối
 -- Cần tạo index cho TẤT CẢ các thuộc tính có is_identity_resolution = TRUE và is_index = TRUE
 -- Loại index (B-tree, GIN) phụ thuộc vào data_type và matching_rule
-CREATE INDEX idx_raw_profiles_stage_email ON raw_profiles_stage (email); -- B-tree cho citext exact match
-CREATE INDEX idx_raw_profiles_stage_phone ON raw_profiles_stage (phone_number); -- B-tree cho VARCHAR exact match
-CREATE INDEX idx_raw_profiles_stage_name_trgm ON raw_profiles_stage USING gin (first_name gin_trgm_ops, last_name gin_trgm_ops); -- GIN cho fuzzy_trgm
--- Thêm các index khác dựa trên cấu hình profile_attributes
+CREATE INDEX idx_raw_profiles_stage_email ON cdp_raw_profiles_stage (email); -- B-tree cho citext exact match
+CREATE INDEX idx_raw_profiles_stage_phone ON cdp_raw_profiles_stage (phone_number); -- B-tree cho VARCHAR exact match
+CREATE INDEX idx_raw_profiles_stage_name_trgm ON cdp_raw_profiles_stage USING gin (first_name gin_trgm_ops, last_name gin_trgm_ops); -- GIN cho fuzzy_trgm
+-- Thêm các index khác dựa trên cấu hình cdp_profile_attributes
 ```
 
 ```sql
--- Bảng 2: master_profiles
+-- Bảng 2: cdp_master_profiles
 -- Lưu trữ các hồ sơ khách hàng đã được giải quyết (unique identities)
-CREATE TABLE master_profiles (
+CREATE TABLE cdp_master_profiles (
     master_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho hồ sơ master
     -- Các trường dữ liệu tổng hợp hoặc đáng tin cậy nhất từ các hồ sơ thô liên quan
     -- Tên cột ở đây nên khớp với attribute_internal_code nếu storage_type là 'COLUMN'
@@ -249,46 +257,46 @@ CREATE TABLE master_profiles (
 -- Tạo Index cho các trường quan trọng dùng cho tìm kiếm master
 -- Cần tạo index cho TẤT CẢ các thuộc tính có is_identity_resolution = TRUE và is_index = TRUE
 -- Loại index (B-tree, GIN) phụ thuộc vào data_type và matching_rule
-CREATE INDEX idx_master_profiles_email ON master_profiles (email); -- B-tree cho citext exact match
-CREATE INDEX idx_master_profiles_phone ON master_profiles (phone_number); -- B-tree cho VARCHAR exact match
-CREATE INDEX idx_master_profiles_name_trgm ON master_profiles USING gin (first_name gin_trgm_ops, last_name gin_trgm_ops); -- GIN cho fuzzy_trgm
--- Thêm các index khác dựa trên cấu hình profile_attributes
+CREATE INDEX idx_master_profiles_email ON cdp_master_profiles (email); -- B-tree cho citext exact match
+CREATE INDEX idx_master_profiles_phone ON cdp_master_profiles (phone_number); -- B-tree cho VARCHAR exact match
+CREATE INDEX idx_master_profiles_name_trgm ON cdp_master_profiles USING gin (first_name gin_trgm_ops, last_name gin_trgm_ops); -- GIN cho fuzzy_trgm
+-- Thêm các index khác dựa trên cấu hình cdp_profile_attributes
 ```
 
 ```sql
--- Bảng 3: profile_links
+-- Bảng 3: cdp_profile_links
 -- Liên kết các hồ sơ thô với hồ hồ sơ master tương ứng
-CREATE TABLE profile_links (
+CREATE TABLE cdp_profile_links (
     link_id BIGSERIAL PRIMARY KEY,
-    raw_profile_id UUID NOT NULL REFERENCES raw_profiles_stage(raw_profile_id),
-    master_profile_id UUID NOT NULL REFERENCES master_profiles(master_profile_id),
+    raw_profile_id UUID NOT NULL REFERENCES cdp_raw_profiles_stage(raw_profile_id),
+    master_profile_id UUID NOT NULL REFERENCES cdp_master_profiles(master_profile_id),
     linked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     match_rule VARCHAR(100) -- Ghi lại quy tắc nào đã dẫn đến việc liên kết (ví dụ: 'ExactEmailMatch', 'FuzzyNamePhone', 'DynamicMatch')
 );
 
 -- Tạo Index để tra cứu nhanh các link
-CREATE INDEX idx_profile_links_raw_id ON profile_links (raw_profile_id);
-CREATE INDEX idx_profile_links_master_id ON profile_links (master_profile_id);
+CREATE INDEX idx_profile_links_raw_id ON cdp_profile_links (raw_profile_id);
+CREATE INDEX idx_profile_links_master_id ON cdp_profile_links (master_profile_id);
 
 -- Ràng buộc duy nhất để tránh liên kết một raw_profile_id với nhiều master_profile_id
-ALTER TABLE profile_links ADD CONSTRAINT uk_profile_links_raw_id UNIQUE (raw_profile_id);
+ALTER TABLE cdp_profile_links ADD CONSTRAINT uk_profile_links_raw_id UNIQUE (raw_profile_id);
 ```
 
 ## Cơ chế Trigger "Real-time"
 
-Để xử lý dữ liệu mới đến từ Firehose theo thời gian thực, chúng ta tạo một trigger trên bảng `raw_profiles_stage`. Trigger này sẽ kích hoạt một hàm trigger đơn giản, hàm này có nhiệm vụ gọi stored procedure nhận dạng danh tính chính (`resolve_customer_identities_dynamic`) để xử lý các bản ghi mới.
+Để xử lý dữ liệu mới đến từ Firehose theo thời gian thực, chúng ta tạo một trigger trên bảng `cdp_raw_profiles_stage`. Trigger này sẽ kích hoạt một hàm trigger đơn giản, hàm này có nhiệm vụ gọi stored procedure nhận dạng danh tính chính (`resolve_customer_identities_dynamic`) để xử lý các bản ghi mới.
 
-**Để tránh quá tải database khi Firehose stream dữ liệu với tần suất cao**, hàm trigger sẽ kiểm tra thời gian chạy gần nhất của stored procedure chính trong một bảng trạng thái riêng (`identity_resolution_status`). Nếu khoảng thời gian tối thiểu chưa trôi qua, hàm trigger sẽ bỏ qua việc gọi stored procedure chính, chỉ để dữ liệu chờ được xử lý bởi trigger tiếp theo (khi đủ điều kiện) hoặc bởi lịch trình hàng ngày.
+**Để tránh quá tải database khi Firehose stream dữ liệu với tần suất cao**, hàm trigger sẽ kiểm tra thời gian chạy gần nhất của stored procedure chính trong một bảng trạng thái riêng (`cdp_id_resolution_status`). Nếu khoảng thời gian tối thiểu chưa trôi qua, hàm trigger sẽ bỏ qua việc gọi stored procedure chính, chỉ để dữ liệu chờ được xử lý bởi trigger tiếp theo (khi đủ điều kiện) hoặc bởi lịch trình hàng ngày.
 
 **1. Tạo bảng trạng thái:**
 
 Tạo một bảng nhỏ chỉ chứa một bản ghi duy nhất để lưu thời gian stored procedure chính chạy gần nhất.
 
 ```sql
--- Bảng Metadata: identity_resolution_status
+-- Bảng Metadata: cdp_id_resolution_status
 -- Bảng này dùng để theo dõi trạng thái và thời gian chạy của stored procedure chính,
 -- giúp kiểm soát tần suất kích hoạt từ trigger real-time.
-CREATE TABLE identity_resolution_status (
+CREATE TABLE cdp_id_resolution_status (
     id BOOLEAN PRIMARY KEY DEFAULT TRUE, -- Chỉ cho phép một bản ghi duy nhất
     last_executed_at TIMESTAMP WITH TIME ZONE NULL, -- Thời gian stored procedure chính chạy gần nhất
     -- Có thể thêm các trường khác nếu cần theo dõi trạng thái (ví dụ: is_running BOOLEAN)
@@ -296,20 +304,20 @@ CREATE TABLE identity_resolution_status (
 );
 
 -- Chèn bản ghi duy nhất ban đầu nếu chưa tồn tại
-INSERT INTO identity_resolution_status (id, last_executed_at) VALUES (TRUE, NULL) ON CONFLICT (id) DO NOTHING;
+INSERT INTO cdp_id_resolution_status (id, last_executed_at) VALUES (TRUE, NULL) ON CONFLICT (id) DO NOTHING;
 ```
 
 **2. Tạo hoặc Sửa đổi hàm trigger:**
 
 Hàm trigger (`process_new_raw_profiles_trigger_func`) sẽ được sửa đổi để:
-* Đọc thời gian `last_executed_at` từ bảng `identity_resolution_status`.
+* Đọc thời gian `last_executed_at` từ bảng `cdp_id_resolution_status`.
 * Sử dụng `FOR UPDATE` khi đọc để khóa bản ghi trạng thái, ngăn các trigger khác đọc/ghi cùng lúc.
 * So sánh thời gian hiện tại với `last_executed_at`.
 * Nếu khoảng thời gian tối thiểu (`min_interval`) đã trôi qua, cập nhật `last_executed_at` và gọi stored procedure chính.
 * Nếu chưa đủ thời gian, bỏ qua việc gọi stored procedure chính.
 
 ```sql
--- Hàm trigger sẽ được gọi sau khi Firehose chèn dữ liệu vào raw_profiles_stage
+-- Hàm trigger sẽ được gọi sau khi Firehose chèn dữ liệu vào cdp_raw_profiles_stage
 -- Hàm này kiểm tra tần suất và chỉ gọi stored procedure nhận dạng danh tính chính nếu đủ điều kiện.
 CREATE OR REPLACE FUNCTION process_new_raw_profiles_trigger_func()
 RETURNS TRIGGER AS $$
@@ -326,19 +334,19 @@ BEGIN
     BEGIN
         -- Khóa bản ghi trạng thái và đọc thời gian chạy gần nhất
         -- Lệnh SELECT FOR UPDATE sẽ chờ nếu bản ghi đang bị khóa bởi trigger khác.
-        PERFORM 1 FROM identity_resolution_status WHERE id = TRUE FOR UPDATE;
-        SELECT last_executed_at INTO last_exec_time FROM identity_resolution_status WHERE id = TRUE;
+        PERFORM 1 FROM cdp_id_resolution_status WHERE id = TRUE FOR UPDATE;
+        SELECT last_executed_at INTO last_exec_time FROM cdp_id_resolution_status WHERE id = TRUE;
 
         -- Kiểm tra xem đã đủ khoảng thời gian tối thiểu kể từ lần chạy gần nhất chưa
         IF last_exec_time IS NULL OR current_time - last_exec_time >= min_interval THEN
             -- Đã đủ điều kiện, cập nhật thời gian chạy gần nhất trong bảng trạng thái
-            UPDATE identity_resolution_status SET last_executed_at = current_time WHERE id = TRUE;
+            UPDATE cdp_id_resolution_status SET last_executed_at = current_time WHERE id = TRUE;
 
             -- Gọi stored procedure nhận dạng danh tính chính để xử lý các bản ghi processed_at IS NULL.
             -- Lệnh PERFORM thực thi hàm nhưng bỏ qua kết quả trả về.
             -- LƯU Ý: Stored procedure chính sẽ chạy trong cùng transaction block này.
-            -- Nếu SP chạy lâu, nó sẽ giữ lock trên bảng identity_resolution_status và có thể
-            -- chặn các trigger khác hoặc các thao tác ghi vào bảng status/raw_profiles_stage.
+            -- Nếu SP chạy lâu, nó sẽ giữ lock trên bảng cdp_id_resolution_status và có thể
+            -- chặn các trigger khác hoặc các thao tác ghi vào bảng status/cdp_raw_profiles_stage.
             -- Đây là hạn chế của cách gọi trực tiếp từ trigger.
             -- Mô hình queue table + scheduler riêng biệt (Option 2 thảo luận trước) sẽ tránh được vấn đề blocking này.
             PERFORM resolve_customer_identities_dynamic();
@@ -371,22 +379,22 @@ $$ LANGUAGE plpgsql;
 
 **3. Tạo trigger:**
 
-Trigger sẽ gọi hàm trigger đã sửa đổi sau mỗi lệnh INSERT hoặc UPDATE theo lô trên bảng `raw_profiles_stage`.
+Trigger sẽ gọi hàm trigger đã sửa đổi sau mỗi lệnh INSERT hoặc UPDATE theo lô trên bảng `cdp_raw_profiles_stage`.
 
 ```sql
 -- Trigger sẽ kích hoạt hàm process_new_raw_profiles_trigger_func
--- sau mỗi lần INSERT hoặc UPDATE trên bảng raw_profiles_stage.
+-- sau mỗi lần INSERT hoặc UPDATE trên bảng cdp_raw_profiles_stage.
 -- FOR EACH STATEMENT: Trigger chỉ chạy một lần cho mỗi lệnh INSERT/UPDATE,
 -- hiệu quả hơn FOR EACH ROW khi Firehose chèn nhiều bản ghi cùng lúc.
-CREATE TRIGGER trigger_process_new_raw_profiles
-AFTER INSERT OR UPDATE ON raw_profiles_stage
+CREATE TRIGGER cdp_trigger_process_new_raw_profiles
+AFTER INSERT OR UPDATE ON cdp_raw_profiles_stage
 FOR EACH STATEMENT
 EXECUTE FUNCTION process_new_raw_profiles_trigger_func();
 
 -- Lưu ý: Bạn cần VÔ HIỆU HÓA trigger này khi thực hiện tải dữ liệu lịch sử lớn
 -- để tránh gọi stored procedure quá nhiều lần.
--- ALTER TABLE raw_profiles_stage DISABLE TRIGGER trigger_process_new_raw_profiles;
--- ALTER TABLE raw_profiles_stage ENABLE TRIGGER trigger_process_new_raw_profiles;
+-- ALTER TABLE cdp_raw_profiles_stage DISABLE TRIGGER cdp_trigger_process_new_raw_profiles;
+-- ALTER TABLE cdp_raw_profiles_stage ENABLE TRIGGER cdp_trigger_process_new_raw_profiles;
 ```
 
 Cơ chế này giúp kiểm soát tần suất gọi stored procedure chính từ trigger real-time, ngăn database bị quá tải bởi các lệnh gọi liên tục khi có lượng dữ liệu lớn đổ về.
@@ -414,8 +422,8 @@ DB_PASSWORD = os.environ.get("DB_PASSWORD", "your_database_password")
 DB_PORT = os.environ.get("DB_PORT", "5432")
 
 # Tên bảng và trigger
-RAW_STAGE_TABLE = "raw_profiles_stage"
-REALTIME_TRIGGER_NAME = "trigger_process_new_raw_profiles"
+RAW_STAGE_TABLE = "cdp_raw_profiles_stage"
+REALTIME_TRIGGER_NAME = "cdp_trigger_process_new_raw_profiles"
 RESOLUTION_SP_NAME = "resolve_customer_identities_dynamic"
 
 def run_daily_identity_resolution():
@@ -481,18 +489,18 @@ if __name__ == "__main__":
 
 ## Quá Trình Nhận Dạng Danh Tính (Bên trong Stored Procedure - SQL)
 
-Đây là stored procedure chính chứa toàn bộ logic nhận dạng danh tính. Nó đọc cấu hình từ bảng profile_attributes để thực hiện ghép nối và tổng hợp dữ liệu một cách động. Stored procedure này được gọi bởi cả real-time trigger và lịch trình hàng ngày.
+Đây là stored procedure chính chứa toàn bộ logic nhận dạng danh tính. Nó đọc cấu hình từ bảng cdp_profile_attributes để thực hiện ghép nối và tổng hợp dữ liệu một cách động. Stored procedure này được gọi bởi cả real-time trigger và lịch trình hàng ngày.
 
-Lưu ý quan trọng: Việc làm cho stored procedure hoàn toàn động dựa trên cấu hình từ bảng metadata là rất phức tạp trong PL/pgSQL, đặc biệt khi các thuộc tính được lưu trữ dưới dạng các cột riêng lẻ trong bảng raw_profiles_stage và master_profiles. Mã ví dụ dưới đây minh họa cách tiếp cận khái niệm về việc đọc cấu hình và xây dựng logic động, nhưng việc truy cập giá trị cột theo tên (lưu dưới dạng chuỗi) và xây dựng các câu truy vấn phức tạp (similarity, dmetaphone, xử lý NULL, ép kiểu) một cách hoàn toàn tự động đòi hỏi kỹ thuật PL/pgSQL nâng cao hoặc thay đổi lược đồ (ví dụ: sử dụng JSONB/HSTORE để lưu giá trị thuộc tính).
+Lưu ý quan trọng: Việc làm cho stored procedure hoàn toàn động dựa trên cấu hình từ bảng metadata là rất phức tạp trong PL/pgSQL, đặc biệt khi các thuộc tính được lưu trữ dưới dạng các cột riêng lẻ trong bảng cdp_raw_profiles_stage và cdp_master_profiles. Mã ví dụ dưới đây minh họa cách tiếp cận khái niệm về việc đọc cấu hình và xây dựng logic động, nhưng việc truy cập giá trị cột theo tên (lưu dưới dạng chuỗi) và xây dựng các câu truy vấn phức tạp (similarity, dmetaphone, xử lý NULL, ép kiểu) một cách hoàn toàn tự động đòi hỏi kỹ thuật PL/pgSQL nâng cao hoặc thay đổi lược đồ (ví dụ: sử dụng JSONB/HSTORE để lưu giá trị thuộc tính).
 
-Mã dưới đây là phiên bản đã được sửa đổi để đọc cấu hình từ profile_attributes và thử xây dựng logic ghép nối động, nhưng phần truy cập giá trị từ bản ghi thô và tổng hợp dữ liệu vẫn cần được mở rộng và hoàn thiện trong một triển khai thực tế.
+Mã dưới đây là phiên bản đã được sửa đổi để đọc cấu hình từ cdp_profile_attributes và thử xây dựng logic ghép nối động, nhưng phần truy cập giá trị từ bản ghi thô và tổng hợp dữ liệu vẫn cần được mở rộng và hoàn thiện trong một triển khai thực tế.
 
 ```sql 
--- Stored Procedure để thực hiện Identity Resolution một cách động dựa trên cấu hình profile_attributes
+-- Stored Procedure để thực hiện Identity Resolution một cách động dựa trên cấu hình cdp_profile_attributes
 CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 1000)
 RETURNS VOID AS $$
 DECLARE
-    r_profile raw_profiles_stage%ROWTYPE; -- Biến cho bản ghi thô hiện tại
+    r_profile cdp_raw_profiles_stage%ROWTYPE; -- Biến cho bản ghi thô hiện tại
     matched_master_id UUID; -- ID của master profile tìm thấy khớp
 
     -- Lấy cấu hình thuộc tính identity resolution chỉ MỘT LẦN khi hàm bắt đầu
@@ -518,11 +526,11 @@ DECLARE
     v_consolidate_config_rec RECORD;
 
 BEGIN
-    -- 1. Lấy cấu hình các thuộc tính identity resolution từ bảng profile_attributes (Chỉ một lần)
+    -- 1. Lấy cấu hình các thuộc tính identity resolution từ bảng cdp_profile_attributes (Chỉ một lần)
     -- Lấy các thuộc tính IR đang hoạt động và có cấu hình ghép nối
     SELECT array_agg(ROW(id, attribute_internal_code, data_type, matching_rule, matching_threshold, consolidation_rule))
     INTO identity_configs_array
-    FROM profile_attributes
+    FROM cdp_profile_attributes
     WHERE is_identity_resolution = TRUE AND status = 'ACTIVE'
     AND matching_rule IS NOT NULL AND matching_rule != 'none';
 
@@ -535,7 +543,7 @@ BEGIN
     -- 2. Lặp qua từng bản ghi profile thô chưa xử lý theo lô
     FOR r_profile IN
         SELECT *
-        FROM raw_profiles_stage
+        FROM cdp_raw_profiles_stage
         WHERE processed_at IS NULL
         LIMIT batch_size
     LOOP
@@ -621,7 +629,7 @@ BEGIN
         v_dynamic_select_query := ''; -- Đặt lại câu truy vấn động
 
         IF array_length(v_where_conditions, 1) IS NOT NULL THEN
-             v_dynamic_select_query := 'SELECT master_profile_id FROM master_profiles mp WHERE ' || array_to_string(v_where_conditions, ' OR ') || ' LIMIT 1';
+             v_dynamic_select_query := 'SELECT master_profile_id FROM cdp_master_profiles mp WHERE ' || array_to_string(v_where_conditions, ' OR ') || ' LIMIT 1';
 
             -- Thực thi câu truy vấn động
             BEGIN
@@ -649,7 +657,7 @@ BEGIN
             BEGIN
                 -- match_rule ở đây nên phản ánh quy tắc nào đã khớp mạnh nhất, rất phức tạp để xác định động
                 -- Hoặc chỉ đơn giản ghi là 'Linked' hoặc 'DynamicMatch'
-                INSERT INTO profile_links (raw_profile_id, master_profile_id, match_rule)
+                INSERT INTO cdp_profile_links (raw_profile_id, master_profile_id, match_rule)
                 VALUES (r_profile.raw_profile_id, matched_master_id, 'DynamicMatch');
             EXCEPTION WHEN unique_violation THEN
                  RAISE NOTICE 'Raw profile % đã được liên kết trong lần chạy khác, bỏ qua.', r_profile.raw_profile_id;
@@ -659,7 +667,7 @@ BEGIN
             -- Tổng hợp dữ liệu vào Master Profile hiện có (Logic phức tạp khi làm động)
             -- Cần lặp lại cấu hình thuộc tính và áp dụng consolidation_rule cho từng thuộc tính IR
             -- Đây là một ví dụ đơn giản, bạn cần mở rộng để làm động dựa trên consolidation_rule
-             UPDATE master_profiles mp
+             UPDATE cdp_master_profiles mp
              SET
                  first_name = COALESCE(mp.first_name, r_profile.first_name), -- Ví dụ rule: non_null
                  email = COALESCE(mp.email, r_profile.email), -- Ví dụ rule: non_null
@@ -679,7 +687,7 @@ BEGIN
 
             -- Tạo một Master Profile mới từ dữ liệu của bản ghi thô
             -- Việc chọn giá trị ban đầu cho master cũng nên tuân theo consolidation_rule (ở đây đơn giản lấy từ raw)
-            INSERT INTO master_profiles (first_name, last_name, email, phone_number, address_line1, city, state, zip_code, source_systems, first_seen_raw_profile_id)
+            INSERT INTO cdp_master_profiles (first_name, last_name, email, phone_number, address_line1, city, state, zip_code, source_systems, first_seen_raw_profile_id)
             VALUES (
                 r_profile.first_name, -- Lấy từ raw (cần áp dụng consolidation_rule nếu muốn)
                 r_profile.last_name,
@@ -696,7 +704,7 @@ BEGIN
 
             -- Liên kết bản ghi thô với Master mới vừa tạo
              BEGIN
-                INSERT INTO profile_links (raw_profile_id, master_profile_id, match_rule)
+                INSERT INTO cdp_profile_links (raw_profile_id, master_profile_id, match_rule)
                 VALUES (r_profile.raw_profile_id, matched_master_id, 'NewMaster');
              EXCEPTION WHEN unique_violation THEN
                  RAISE NOTICE 'Raw profile % đã được liên kết trong lần chạy khác, bỏ qua.', r_profile.raw_profile_id;
@@ -706,7 +714,7 @@ BEGIN
         END IF; -- Kết thúc xử lý kết quả khớp
 
         -- 6. Đánh dấu bản ghi thô đã được xử lý thành công
-        UPDATE raw_profiles_stage
+        UPDATE cdp_raw_profiles_stage
         SET processed_at = NOW()
         WHERE raw_profile_id = r_profile.raw_profile_id;
 
@@ -722,41 +730,41 @@ $$ LANGUAGE plpgsql;
 
 ## Phân tích & Báo cáo (SQL)
 
-Sau khi quá trình nhận dạng chạy, bạn có thể truy vấn các bảng master_profiles và profile_links để có được các số liệu thống kê về số lượng hồ sơ duy nhất và trùng lặp.
+Sau khi quá trình nhận dạng chạy, bạn có thể truy vấn các bảng cdp_master_profiles và cdp_profile_links để có được các số liệu thống kê về số lượng hồ sơ duy nhất và trùng lặp.
 
 ```sql
 -- Tổng số Hồ sơ Thô (Total Raw Profiles):
-SELECT COUNT(*) FROM raw_profiles_stage;
+SELECT COUNT(*) FROM cdp_raw_profiles_stage;
 
 -- Số lượng Hồ sơ Master Duy nhất (Number of Unique Identities):
-SELECT COUNT(*) FROM master_profiles;
+SELECT COUNT(*) FROM cdp_master_profiles;
 -- Hoặc (nên cho kết quả tương tự nếu logic liên kết đúng)
-SELECT COUNT(DISTINCT master_profile_id) FROM profile_links;
+SELECT COUNT(DISTINCT master_profile_id) FROM cdp_profile_links;
 
 -- Số lượng Hồ sơ Thô đã được giải quyết (Processed Raw Profiles):
-SELECT COUNT(*) FROM raw_profiles_stage WHERE processed_at IS NOT NULL;
+SELECT COUNT(*) FROM cdp_raw_profiles_stage WHERE processed_at IS NOT NULL;
 
 -- Số lượng Hồ sơ Thô được liên kết với một Master (Linked Raw Profiles):
-SELECT COUNT(*) FROM profile_links;
+SELECT COUNT(*) FROM cdp_profile_links;
 
 -- Số lượng Hồ sơ Thô được coi là trùng lặp (Raw Profiles considered Duplicates):
 -- Đây là những hồ sơ thô được liên kết đến một master_profile_id mà master đó không được tạo ra từ chính hồ sơ thô đó
 SELECT COUNT(*)
-FROM profile_links pl
-JOIN master_profiles mp ON pl.master_profile_id = mp.master_profile_id
+FROM cdp_profile_links pl
+JOIN cdp_master_profiles mp ON pl.master_profile_id = mp.master_profile_id
 WHERE pl.raw_profile_id != mp.first_seen_raw_profile_id; -- Giả định first_seen_raw_profile_id lưu ID thô đầu tiên tạo master
 
 -- Hoặc, đếm các master có nhiều hơn một liên kết:
 SELECT COUNT(*)
 FROM (
     SELECT master_profile_id
-    FROM profile_links
+    FROM cdp_profile_links
     GROUP BY master_profile_id
     HAVING COUNT(*) > 1
 ) AS duplicate_masters;
 
 -- Số lượng Hồ sơ Thô chưa được xử lý (Unprocessed Raw Profiles):
-SELECT COUNT(*) FROM raw_profiles_stage WHERE processed_at IS NULL;
+SELECT COUNT(*) FROM cdp_raw_profiles_stage WHERE processed_at IS NULL;
 ```
 
 
@@ -789,7 +797,7 @@ Tối ưu `Parameter Group` trong RDS:
   - Provision throughput để tránh nghẽn.
 
 #### 🧩 Phân vùng (Partitioning)
-- Áp dụng với các bảng lớn như `raw_profiles_stage`, `master_profiles`.
+- Áp dụng với các bảng lớn như `cdp_raw_profiles_stage`, `cdp_master_profiles`.
 - Tiêu chí phân vùng:
   - Theo thời gian (`received_date`).
   - Theo hash ID (`hash(profile_id) % N`).
@@ -870,11 +878,11 @@ Tối ưu `Parameter Group` trong RDS:
 
 ### 🧩 **2. Thiết kế bảng & phân vùng**
 
-- [ ] `raw_profiles_stage`:
+- [ ] `cdp_raw_profiles_stage`:
   - [ ] Có các column `is_identity_resolution = TRUE`
   - [ ] Index theo các trường dùng để ghép (B-tree/GiN)
   - [ ] Phân vùng nếu cần (theo `received_date` hoặc `hash(profile_id)`)
-- [ ] `master_profiles`:
+- [ ] `cdp_master_profiles`:
   - [ ] Index đầy đủ trên các key lookup
   - [ ] Thiết kế phù hợp với UPSERT logic
 
@@ -906,7 +914,7 @@ Tối ưu `Parameter Group` trong RDS:
 
 ### 🧠 **5. Metadata & Điều kiện ghép**
 
-- [ ] Bảng metadata `profile_attributes` đầy đủ cấu hình
+- [ ] Bảng metadata `cdp_profile_attributes` đầy đủ cấu hình
 - [ ] Có flag `is_identity_resolution` rõ ràng
 - [ ] Stored procedure xử lý metadata động hiệu quả
 - [ ] Hỗ trợ nhiều kiểu matching (exact, fuzzy)
