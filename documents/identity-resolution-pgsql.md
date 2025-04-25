@@ -123,24 +123,59 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm; -- Cho similarity based on trigrams
 ```
 
 ### Tables for meta-data
+Đây là một thiết kế **metadata-driven** cho hệ thống quản lý thuộc tính (attribute) của profile trong một Customer Data Platform (CDP). 
+
+Mục đích và lý do: 
+
+- Cho phép người dùng định nghĩa động các thuộc tính profile không cần thay đổi schema DB.
+- Cho phép triển khai hệ thống **Identity Resolution** linh hoạt theo từng trường cụ thể.
+- Hỗ trợ nhiều loại logic xử lý ETL như mapping, masking, phân nhóm, đồng bộ.
+
+Bảng `cdp_profile_attributes` là trung tâm, chứa cấu hình cho từng thuộc tính có thể xuất hiện trong một profile (ví dụ: họ tên, email, độ tuổi, v.v.). 
+Phía dưới là phần **giải thích chi tiết từng bảng và cột**:
+
+#### 🔹 1. `cdp_attribute_type`
+**Mục đích**: Xác định loại của attribute theo hướng UI hoặc logic dữ liệu.
 
 ```sql
--- Bảng Metadata: attribute_type (Placeholder - cần định nghĩa chi tiết nếu sử dụng FK)
--- Bảng này định nghĩa các loại control UI hoặc kiểu attribute chung.
-
 -- Bảng Metadata: attribute_type (Placeholder - cần định nghĩa chi tiết nếu sử dụng FK)
 -- Bảng này định nghĩa các loại control UI hoặc kiểu attribute chung.
 CREATE TABLE IF NOT EXISTS cdp_attribute_type (
     id SERIAL PRIMARY KEY,
     type_name VARCHAR(100) UNIQUE NOT NULL
 );
+```
 
+**Ví dụ giá trị**:
+- `text_field`, `dropdown`, `checkbox`, `multi-select`, `date_picker`,...
+
+---
+
+#### 🔹 2. `cdp_objects`
+**Mục đích**: Xác định *loại đối tượng* mà thuộc tính này thuộc về (ví dụ: Customer, Product, Booking...).
+
+```sql
 -- Bảng Metadata: objects (Placeholder - cần định nghĩa chi tiết nếu sử dụng FK)
 -- Bảng này định nghĩa các loại đối tượng chính (ví dụ: Customer, Product).
 CREATE TABLE IF NOT EXISTS cdp_objects (
     id SERIAL PRIMARY KEY,
     object_name VARCHAR(100) UNIQUE NOT NULL
 );
+```
+
+**Ví dụ giá trị**:
+- `Customer`, `Lead`, `Product`, `Transaction`,...
+
+---
+
+#### 🔹 3. `cdp_profile_attributes`
+**Mục đích**: Định nghĩa đầy đủ về một attribute bao gồm:
+- Metadata mô tả logic lưu trữ & hiển thị
+- Thông tin xử lý dữ liệu
+- Luật cho identity resolution
+- Tùy chọn hiển thị / UI / logic nghiệp vụ
+
+```sql
 
 -- Bảng Metadata: cdp_profile_attributes
 -- Bảng này định nghĩa *meta-data* cho từng thuộc tính (attribute) của profile.
@@ -179,6 +214,7 @@ CREATE TABLE cdp_profile_attributes (
     consolidation_rule VARCHAR(50) NULL -- Cách tổng hợp giá trị (vd: 'most_recent', 'non_null', 'concatenate', 'prefer_master', 'prefer_raw')
 );
 ```
+
 
 ### Trigger
 

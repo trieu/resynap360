@@ -2,15 +2,17 @@
 DELETE FROM cdp_profile_attributes;
 
 -- Insert sample identity resolution attributes
+-- Insert sample identity resolution attributes
 INSERT INTO cdp_profile_attributes (
     id, name,  attribute_internal_code, data_type,
     is_identity_resolution, matching_rule, matching_threshold,
-    consolidation_rule, status
+    consolidation_rule, status, is_index
 ) VALUES
-(1, 'email', 'email', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE'),
-(2, 'phone_number','phone_number', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE'),
-(3,'first_name',  'first_name', 'TEXT', TRUE, 'fuzzy_dmetaphone', NULL, 'most_recent', 'ACTIVE'),
-(4,'last_name', 'last_name', 'TEXT', TRUE, 'fuzzy_trgm', 0.7, 'most_recent', 'ACTIVE');
+(1, 'email', 'email', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
+(2, 'phone_number','phone_number', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
+(3,'first_name',  'first_name', 'TEXT', TRUE, 'fuzzy_dmetaphone', NULL, 'most_recent', 'ACTIVE', FALSE),
+(4,'last_name', 'last_name', 'TEXT', TRUE, 'fuzzy_trgm', 0.7, 'most_recent', 'ACTIVE', FALSE),
+(5,'zalo_user_id', 'zalo_user_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE);
 
 
 -- Clear existing raw profiles

@@ -1,4 +1,4 @@
--- 1. Tạo TYPE dùng cho identity resolution config
+-- 1. Define the TYPE used for dynamic identity resolution config
 DO $$ BEGIN
     CREATE TYPE identity_config_type AS (
         id INT,
@@ -9,47 +9,59 @@ DO $$ BEGIN
         cons_rule VARCHAR
     );
 EXCEPTION
-    WHEN duplicate_object THEN NULL; -- Nếu type đã tồn tại thì bỏ qua
+    WHEN duplicate_object THEN NULL; -- Skip if TYPE already exists
 END $$;
 
--- 2. Hàm chính với logic dynamic identity resolution
+-- 2. Main function for dynamic identity resolution
 CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 1000)
 RETURNS VOID AS $$
 DECLARE
-    r_profile cdp_raw_profiles_stage%ROWTYPE; -- Biến cho bản ghi thô hiện tại
-    matched_master_id UUID; -- ID của master profile tìm thấy khớp
+    -- Row variable for raw profile records
+    r_profile cdp_raw_profiles_stage%ROWTYPE;
 
-    identity_configs_array identity_config_type[]; -- Mảng chứa cấu hình IR từ bảng cấu hình
+    -- ID of matched master profile (if found)
+    matched_master_id UUID;
 
-    v_where_conditions TEXT[] := '{}'; -- Danh sách điều kiện WHERE động
+    -- Array of identity resolution configurations
+    identity_configs_array identity_config_type[];
+
+    -- Dynamic WHERE conditions for matching query
+    v_where_conditions TEXT[] := '{}';
     v_condition_text TEXT;
 
-    v_identity_config_rec identity_config_type; -- Biến duyệt từng cấu hình trong mảng
+    -- Loop variables for config
+    v_identity_config_rec identity_config_type;
     v_raw_value_text TEXT;
     v_master_col_name TEXT;
 
+    -- Final dynamic SQL query for matching
     v_dynamic_select_query TEXT;
 
-    -- Các biến tổng hợp chưa được dùng đầy đủ
+    -- Unused dynamic consolidation placeholders
     v_update_set_clauses TEXT[] := '{}';
     v_insert_cols TEXT[] := '{}';
     v_insert_values TEXT[] := '{}';
     v_consolidate_config_rec RECORD;
 
 BEGIN
-    -- 1. Lấy các cấu hình IR
-    SELECT array_agg(ROW(id, attribute_internal_code, data_type, matching_rule, matching_threshold, consolidation_rule)::identity_config_type)
+    -- 1. Fetch active IR configs from attribute config table
+    SELECT array_agg(
+        ROW(id, attribute_internal_code, data_type, matching_rule, matching_threshold, consolidation_rule)::identity_config_type
+    )
     INTO identity_configs_array
     FROM cdp_profile_attributes
-    WHERE is_identity_resolution = TRUE AND status = 'ACTIVE'
-    AND matching_rule IS NOT NULL AND matching_rule != 'none';
+    WHERE is_identity_resolution = TRUE
+      AND status = 'ACTIVE'
+      AND matching_rule IS NOT NULL
+      AND matching_rule != 'none';
 
+    -- If no config found, skip
     IF identity_configs_array IS NULL OR array_length(identity_configs_array, 1) IS NULL THEN
-        RAISE WARNING 'Không có thuộc tính identity resolution hoạt động được cấu hình.';
+        RAISE WARNING 'Config table cdp_profile_attributes is empty. Skipping resolve_customer_identities_dynamic.';
         RETURN;
     END IF;
 
-    -- 2. Duyệt qua các bản ghi thô chưa xử lý
+    -- 2. Iterate through raw profiles that haven't been processed
     FOR r_profile IN
         SELECT *
         FROM cdp_raw_profiles_stage
@@ -59,12 +71,12 @@ BEGIN
         matched_master_id := NULL;
         v_where_conditions := '{}';
 
-        -- 3. Lặp qua các cấu hình IR
+        -- 3. Iterate over identity resolution configs
         FOREACH v_identity_config_rec IN ARRAY identity_configs_array
         LOOP
             v_raw_value_text := NULL;
 
-            -- 3.1 Lấy giá trị thuộc tính từ bản ghi thô
+            -- 3.1 Map attribute code to actual column values in raw profile
             CASE v_identity_config_rec.attr_code
                 WHEN 'first_name' THEN v_raw_value_text := r_profile.first_name::TEXT;
                 WHEN 'last_name' THEN v_raw_value_text := r_profile.last_name::TEXT;
@@ -72,15 +84,18 @@ BEGIN
                 WHEN 'phone_number' THEN v_raw_value_text := r_profile.phone_number::TEXT;
                 WHEN 'address_line1' THEN v_raw_value_text := r_profile.address_line1::TEXT;
                 ELSE
-                    RAISE WARNING 'Thuộc tính IR "%" không được hỗ trợ.', v_identity_config_rec.attr_code;
+                    RAISE WARNING 'Unsupported attribute in config: "%"', v_identity_config_rec.attr_code;
                     CONTINUE;
             END CASE;
 
-            -- 3.2 Kiểm tra giá trị hợp lệ
-            IF v_raw_value_text IS NOT NULL AND (v_identity_config_rec.data_type NOT IN ('VARCHAR', 'citext', 'TEXT') OR v_raw_value_text != '') THEN
+            -- 3.2 Validate the raw value before creating match conditions
+            IF v_raw_value_text IS NOT NULL AND (
+                v_identity_config_rec.data_type NOT IN ('VARCHAR', 'citext', 'TEXT') OR v_raw_value_text != ''
+            ) THEN
                 v_master_col_name := v_identity_config_rec.attr_code;
                 v_condition_text := '';
 
+                -- 3.3 Build match condition based on configured match_rule
                 CASE v_identity_config_rec.match_rule
                     WHEN 'exact' THEN
                         v_condition_text := format('mp.%I = %L', v_master_col_name, v_raw_value_text);
@@ -89,18 +104,18 @@ BEGIN
                         IF v_identity_config_rec.data_type IN ('VARCHAR', 'citext', 'TEXT') AND v_identity_config_rec.threshold IS NOT NULL THEN
                             v_condition_text := format('similarity(mp.%I, %L) >= %s', v_master_col_name, v_raw_value_text, v_identity_config_rec.threshold);
                         ELSE
-                            RAISE WARNING 'Fuzzy_trgm không hợp lệ với "%".', v_identity_config_rec.attr_code;
+                            RAISE WARNING 'Invalid fuzzy_trgm config for "%".', v_identity_config_rec.attr_code;
                         END IF;
 
                     WHEN 'fuzzy_dmetaphone' THEN
                         IF v_identity_config_rec.data_type IN ('VARCHAR', 'citext', 'TEXT') THEN
                             v_condition_text := format('dmetaphone(mp.%I) = dmetaphone(%L)', v_master_col_name, v_raw_value_text);
                         ELSE
-                            RAISE WARNING 'Fuzzy_dmetaphone không hợp lệ với "%".', v_identity_config_rec.attr_code;
+                            RAISE WARNING 'Invalid fuzzy_dmetaphone config for "%".', v_identity_config_rec.attr_code;
                         END IF;
 
                     ELSE
-                        RAISE WARNING 'match_rule không xác định: %', v_identity_config_rec.match_rule;
+                        RAISE WARNING 'Unknown match_rule: %', v_identity_config_rec.match_rule;
                         CONTINUE;
                 END CASE;
 
@@ -110,26 +125,28 @@ BEGIN
             END IF;
         END LOOP;
 
-        -- 4. Thực thi truy vấn tìm khớp
+        -- 4. Execute dynamic match query against master profile table
         IF array_length(v_where_conditions, 1) IS NOT NULL THEN
-            v_dynamic_select_query := 'SELECT master_profile_id FROM cdp_master_profiles mp WHERE ' || array_to_string(v_where_conditions, ' OR ') || ' LIMIT 1';
+            v_dynamic_select_query := 'SELECT master_profile_id FROM cdp_master_profiles mp WHERE ' ||
+                                      array_to_string(v_where_conditions, ' OR ') || ' LIMIT 1';
 
             BEGIN
                 EXECUTE v_dynamic_select_query INTO matched_master_id;
             EXCEPTION
                 WHEN OTHERS THEN
-                    RAISE WARNING 'Lỗi truy vấn: % - SQL: %', SQLERRM, v_dynamic_select_query;
+                    RAISE WARNING 'Query execution failed: % - SQL: %', SQLERRM, v_dynamic_select_query;
                     matched_master_id := NULL;
             END;
         END IF;
 
-        -- 5. Xử lý kết quả khớp
+        -- 5. Process result: update or insert master profile, then link
         IF matched_master_id IS NOT NULL THEN
+            -- 5.1 Match found: update master profile and insert link
             BEGIN
                 INSERT INTO cdp_profile_links (raw_profile_id, master_profile_id, match_rule)
                 VALUES (r_profile.raw_profile_id, matched_master_id, 'DynamicMatch');
             EXCEPTION WHEN unique_violation THEN
-                CONTINUE;
+                CONTINUE; -- Skip duplicate links
             END;
 
             UPDATE cdp_master_profiles mp
@@ -146,8 +163,12 @@ BEGIN
             WHERE mp.master_profile_id = matched_master_id;
 
         ELSE
-            -- Không khớp, tạo mới
-            INSERT INTO cdp_master_profiles (first_name, last_name, email, phone_number, address_line1, city, state, zip_code, source_systems, first_seen_raw_profile_id)
+            -- 5.2 No match found: create new master profile and link
+            INSERT INTO cdp_master_profiles (
+                first_name, last_name, email, phone_number,
+                address_line1, city, state, zip_code,
+                source_systems, first_seen_raw_profile_id
+            )
             VALUES (
                 r_profile.first_name,
                 r_profile.last_name,
@@ -170,7 +191,7 @@ BEGIN
             END;
         END IF;
 
-        -- 6. Đánh dấu đã xử lý
+        -- 6. Mark raw profile as processed
         UPDATE cdp_raw_profiles_stage
         SET processed_at = NOW()
         WHERE raw_profile_id = r_profile.raw_profile_id;

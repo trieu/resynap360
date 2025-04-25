@@ -8,6 +8,8 @@ CREATE TABLE cdp_raw_profiles_stage (
     last_name VARCHAR(255),
     email citext, -- Sử dụng citext cho email
     phone_number VARCHAR(50), -- Cần chuẩn hóa số điện thoại trước hoặc trong quá trình xử lý
+    zalo_user_id VARCHAR(50), -- Zalo User ID 
+    crm_id VARCHAR(50), -- CRM User ID 
     address_line1 VARCHAR(255),
     city VARCHAR(255),
     state VARCHAR(255),
