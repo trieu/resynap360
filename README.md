@@ -103,10 +103,12 @@ Dùng PostgreSQL cho phép bạn xây dựng một **identity resolution engine 
 
 ---
 
-## ⚡ Kết quả: Real-time AI Agentic Engagement
+## ⚡ Kết quả: Single Customer View cho Real-time AI Agentic Engagement
 
 Khi danh tính được phân giải thành công:
-- System sẽ notify qua **SNS hoặc Kafka topic**
+
+- Có **Single Customer View** thì **Hyper-Personalization** sẽ chính xác hơn
+- System sẽ notify qua **SNS hoặc Kafka topic** để các dịch vụ khác sử dụng data
 - Các **AI Agent** (Zalo, SMS, Web notification,...) có thể tự động gửi message đúng lúc, đúng người
 
 ---
