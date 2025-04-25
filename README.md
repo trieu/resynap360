@@ -1,153 +1,128 @@
-# Real-time Entity Resolution using AWS Tech Stack
-
-## Giới thiệu
-
-Tài liệu này mô tả kiến trúc giải pháp Nhận dạng Thực thể (Entity Resolution) theo thời gian thực sử dụng các dịch vụ của Amazon Web Services (AWS). Mục tiêu là thu thập, xử lý và hợp nhất dữ liệu về các thực thể (ví dụ: khách hàng, sản phẩm) từ nhiều nguồn khác nhau để tạo ra một cái nhìn thống nhất và chính xác, hỗ trợ các hoạt động engagement và phân tích theo thời gian thực.
-
-## Vì sao CDP cần Entity Resolution hay Customer Identity Resolution - CIR
-
-![data-unification](data-unification.png)
-
-
-Việc **hợp nhất dữ liệu khách hàng từ nhiều nguồn thành một hồ sơ duy nhất** (Customer Identity Resolution - CIR) là **chìa khóa nền tảng** để xây dựng bất kỳ chiến lược data-driven nào trong kỷ nguyên AI và cá nhân hóa. CIR là "must-have" feature của mọi CDP (Customer Data Platform) 
-
-Dưới đây là **5 lý do cấp thiết** vì sao doanh nghiệp nên ưu tiên thực hiện điều này càng sớm càng tốt:
-
-### 1. **Tạo góc nhìn 360° về khách hàng**
-
-- Không thể phục vụ đúng người nếu không hiểu họ thực sự là ai.
-- Khi dữ liệu từ web, app, CRM, email, social, offline... được hợp nhất, bạn có một cái nhìn toàn diện về hành vi, nhu cầu, giá trị vòng đời (CLV) và lịch sử tương tác của mỗi khách hàng.
-- Đây là nền tảng để phân khúc sâu hơn, đưa ra dự đoán hành vi, và xây dựng chiến lược cá nhân hóa có tác động thực sự.
-
-### 2. **Tăng độ chính xác trong phân tích và dự đoán**
-
-- Garbage in = Garbage out. Dữ liệu sai sẽ làm hỏng mọi mô hình.
-- Nếu dữ liệu khách hàng bị phân mảnh hoặc trùng lặp, mọi phân tích – từ marketing attribution đến mô hình AI – đều bị sai lệch.
-- CIR làm sạch và thống nhất dữ liệu đầu vào, giúp các thuật toán và dashboard phản ánh đúng thực tế.
-
-### 3. **Tối ưu hiệu suất marketing và ngân sách**
-- Gửi thông tin content và product đúng người = ít tốn tiền, hiệu quả cao.
-- Khi biết rõ ai là ai, bạn tránh việc gửi trùng thông điệp, chạy quảng cáo lặp lại, hoặc remarketing sai người.
-- CIR giúp tiết kiệm chi phí quảng cáo, tăng ROI chiến dịch và giảm churn thông qua các tương tác đúng thời điểm.
-
-### 4. **Hỗ trợ trải nghiệm khách hàng liền mạch (Omni-channel CX)**
-
-- Khách hàng kỳ vọng bạn "nhớ họ" dù tương tác ở bất kỳ kênh nào.
-- CIR giúp đảm bảo rằng mọi bộ phận – từ CSKH đến marketing – đều nhìn thấy cùng một thông tin khách hàng, ở mọi điểm chạm (touchpoint).
-- Điều này tạo nên trải nghiệm mượt mà, nhất quán và tăng độ hài lòng khách hàng.
-
-### 5. **Tuân thủ pháp lý và bảo mật dữ liệu**
-
-- Không chỉ là hiệu quả, mà còn là sống còn.
-- Các quy định như GDPR, CCPA yêu cầu bạn phải biết rõ bạn lưu trữ thông tin gì, ở đâu, và ai có quyền truy cập.
-- CIR giúp gom dữ liệu về một nơi, dễ dàng thực hiện các quyền của khách hàng như "xóa", "sửa", hay "yêu cầu truy cập".
-
-### 👉 Bottom line:
-
-**Nếu không làm CIR, bạn đang ra quyết định dựa trên bức tranh mờ nhòe về khách hàng.**  
-Không có CIR, mọi nỗ lực AI/ML/CDP/Personalization chỉ là “dựng lâu đài trên cát”.
-
-## Kiến trúc Tổng thể
+# 🔍 Real-time Entity Resolution + Agentic AI for Customer Engagement  
 
 ![Flow Diagram](diagram.png)
 
-Kiến trúc giải pháp bao gồm các luồng dữ liệu chính: thu thập sự kiện, xử lý sự kiện thành thực thể, nhận dạng và hợp nhất thực thể, cập nhật metadata, và tiêu thụ dữ liệu đã giải quyết cho engagement và phân tích.
+### 👉 Lý do chọn PostgreSQL 16 cho Identity Resolution quy mô lớn
 
-## Các Thành phần Chính
+Trong kiến trúc CDP hiện đại, việc giải quyết trùng lặp danh tính (Identity Resolution) là **trái tim của cá nhân hóa & phân tích hành vi**. 
+Dưới đây là kiến trúc nhắm tới xử lý dữ liệu hành vi real-time, mở rộng linh hoạt, và dễ tùy biến với cả stack AWS lẫn Open Source.
 
-1.  **Lead / Customer:** Các thực thể chính mà chúng ta muốn nhận dạng và hợp nhất.
+---
 
-2.  **Touchpoints (Web, Mobile App, IoT...):** Các điểm tương tác nơi sự kiện (event) được tạo ra.
+## 🧠 Tổng quan luồng xử lý
 
-3.  **Event Sources (with SDK):** Các nguồn phát sinh sự kiện, thường sử dụng SDK để định dạng và gửi dữ liệu.
+### 1️⃣ **Customer Touchpoints (App, Web, IoT...)**
+Khách hàng tương tác qua app, web, hoặc thiết bị IoT. Tracking JS sẽ gửi event theo dạng JSON đến:
 
-4.  **AWS Firehose:** Dịch vụ thu thập và phân phối dữ liệu stream theo thời gian thực, được sử dụng để thu thập các sự kiện.
+- `API Gateway` (AWS) hoặc
+- HTTP endpoint (tự host bằng FastAPI, Express,...) với NginX hay AWS ALB
 
-5.  **Raw Data Lake (AWS S3):** Kho lưu trữ dữ liệu thô dựa trên Amazon S3, nơi Firehose có thể sao lưu hoặc phân phối dữ liệu thô.
+### 2️⃣ **Firehose hoặc Kafka**  
+Sự kiện được đẩy vào hệ thống thu thập:
+- **AWS Firehose**: dễ dùng, tích hợp sẵn với S3, Redshift, OpenSearch
+- **Apache Kafka**: chủ động hơn, phù hợp nếu bạn đã có hạ tầng Open Source
 
-6.  **F2: Event To Entities (Lambda):** Một Lambda function xử lý sự kiện thô từ hàng đợi dữ liệu (Data Queue).
+### 3️⃣ **Raw Data Lake (S3 hoặc HDFS)**  
+Mọi event gốc đều được lưu xuống Data Lake để audit, training model hoặc query ad-hoc.
 
-    - 1. Pull Raw Record from Data Queue: Lấy dữ liệu thô.
+### 4️⃣ **Lambda Function (F2: Event to Entity)**  
+Lambda/worker backend sẽ:
+- Kéo dữ liệu từ Kafka/Firehose
+- Chuẩn hóa và mapping field
+- Build các **customer profile entity**
+- Lưu vào **PostgreSQL**
 
-    - 2. Transform Raw Record to Clean Event: Chuyển đổi và làm sạch dữ liệu sự kiện.
+---
 
-    - 3. Data Validation & build Profile Entities: Xác thực dữ liệu và xây dựng các thực thể profile.
+## 🚀 Lý do chọn **PostgreSQL ** cho Entity Resolution Service
 
-    - 4. Save Profile Entities into PostgreSQL: Lưu các thực thể profile vào cơ sở dữ liệu PostgreSQL.
+Khối xử lý thực thể (Entity Resolution) chính là nơi xảy ra **magic**: kết nối nhiều mảnh dữ liệu rời rạc thành một **identity duy nhất**. 
+Lý do chọn **PostgreSQL 16+** là vì:
 
-7.  **Entity Resolution Service (PostgreSQL 16+):** Cơ sở dữ liệu PostgreSQL (phiên bản 16 trở lên) đóng vai trò là trung tâm lưu trữ và thực thi logic nhận dạng thực thể.
+### ✅ **1. CTEs & JSON/JSONB Processing cực mạnh**
+- Phân tích dữ liệu profile lưu dưới dạng JSON
+- Truy vấn phân lớp, join động theo rule rất linh hoạt
 
-8.  **CDP Admin DB:** Cơ sở dữ liệu quản trị cho Nền tảng Dữ liệu Khách hàng (CDP), có thể lưu trữ các cấu hình và dữ liệu quản trị khác.
+### ✅ **2. Stored Procedure & PL/pgSQL nâng cấp**
+- PostgreSQL 16 hỗ trợ `CALL` stored procedures giống Oracle
+- Có thể build 1 engine "rule-based identity matching" chạy bên trong DB 
+- Giảm load data từ database ra code
 
-9.  **F1: Profile Attributes (Lambda):**
-    Một Lambda function có nhiệm vụ tạo tables, triggers và metadata của Identity Resulution bằng tất cả SQL files trong sql-tests. 
-    Sau đó, định kỳ F1 Lambda sẽ cập nhật metadata vào bảng `cdp_profile_attributes` trong Entity Resolution Service DB từ CDP Admin DB
+### ✅ **3. Performance cải thiện rõ rệt ở JOIN và Parallel Scan**
+- Khi khối lượng dữ liệu profile > 100M rows, khả năng scale trở nên rõ ràng
+- Có thể tối ưu query theo từng trường hợp matching logic (email, phone, deviceID,...)
 
-        Flow:
-        CDP Admin -> CDP Admin DB -> F1 Lambda -> Bảng `profile_attributes` (trong Entity Resolution Service DB)
+### ✅ **4. Extension Support: pg_trgm, bloom, etc.**
+- So khớp fuzzy matching rất dễ implement
+- Có thể dùng `SIMILARITY()` hoặc `LEVENSHTEIN()` để tìm match gần đúng
 
-10. **AWS SNS / Apache Kafka:** Hệ thống nhắn tin/streaming được sử dụng để phân phối các sự kiện (ví dụ: sự kiện Entity Resolution với master profile đã giải quyết).
+### ✅ **5. Không lock-in vendor, dễ migrate**
+- Dù deploy trên RDS, Aurora hay PostgreSQL open-source đều được
+- Linh hoạt giữa AWS và on-premises/Open Source infra
 
-11. **F3: Notify event: Resolution is finished (Lambda):** Một Lambda function được kích hoạt bởi sự kiện từ SNS/Kafka, thông báo khi quá trình nhận dạng hoàn tất cho một thực thể.
+---
 
-12. **Real-time Engagement Channels / AI Agents:** Các hệ thống tiêu thụ dữ liệu thực thể đã giải quyết hoặc các sự kiện thông báo để thực hiện các hoạt động engagement (ví dụ: gửi thông báo Zalo, SMS, Push Notification, tương tác Chatbot).
+## ❌ Tại sao không dùng MongoDB / DynamoDB / Elasticsearch cho Identity Resolution?
 
-13. **Monitor Real-time Entity Resolution Service:** Thành phần giám sát hiệu suất và trạng thái của dịch vụ nhận dạng thực thể.
+Các hệ NoSQL hoặc Search Engine như MongoDB, DynamoDB, Elasticsearch (OpenSearch) có nhiều ưu điểm về tốc độ đọc ghi đơn giản — nhưng lại **rất hạn chế khi xử lý logic phân giải danh tính phức tạp**, đặc biệt:
 
-14. **AWS Athena:** Dịch vụ truy vấn dữ liệu trực tiếp trên Data Lake (S3) bằng SQL, được sử dụng cho các báo cáo Ad-hoc.
+### ⚠️ Hạn chế:
 
-15. **ElastiCache:** Dịch vụ caching, có thể được sử dụng để lưu trữ các thực thể profile hoặc kết quả nhận dạng thường xuyên truy cập để giảm độ trễ.
+- **Không hỗ trợ join động hoặc CTE** → khó xử lý match theo nhiều điều kiện phức tạp (multi-field logic)
+- **Khó viết logic phân lớp hoặc phân nhánh theo rule động**
+- **Thiếu công cụ debug, trace query, hoặc audit logic một cách rõ ràng**
+- **Fuzzy matching bị giới hạn hoặc phải mở rộng bằng custom script (tốn effort, scale không tốt)**
 
-16. **Apache Superset / Analytics Dashboard / Data Analyst:** Bộ công cụ và người dùng cuối cho phân tích dữ liệu, truy vấn dữ liệu đã giải quyết hoặc dữ liệu thô trong Data Lake.
+---
 
-## Luồng Xử lý Dữ liệu Chính
+## ✅ Lý do chọn SQL-based engine (PostgreSQL 16+)
 
-1.  Sự kiện được tạo ra tại các **Touchpoints** và gửi từ **Event Sources**.
+Dùng PostgreSQL cho phép bạn xây dựng một **identity resolution engine tinh gọn, mở rộng được và kiểm soát chặt chẽ**, nhờ:
 
-2.  Sự kiện được thu thập bởi **AWS Firehose**.
+### 💡 Ưu điểm vượt trội:
 
-3.  Firehose đẩy dữ liệu sự kiện vào **Raw Data Lake (AWS S3)** để lưu trữ lâu dài.
+- 🔁 **Tái sử dụng rule dễ dàng** qua view/stored procedure
+- 🧩 **Dynamic rule logic** được config từ table (`cdp_profile_attributes`) → không cần hardcode
+- 🔍 **Dễ trace**: có thể log lại từng bước match, từng điều kiện khớp
+- 🧪 **Testing & audit dễ dàng**: chỉ cần chạy lại SQL để so sánh version logic trước/sau
+- 🧠 **Fuzzy matching & scoring** bằng `pg_trgm`, `Levenshtein`, `bloom` extension — không cần dùng tool ngoài
 
-4.  **F2: Convert Event To Entity (Lambda)** kéo dữ liệu từ hàng đợi dữ liệu (có thể là một Kinesis Stream hoặc đọc trực tiếp từ S3/Firehose buffer), chuyển đổi, xác thực và xây dựng các thực thể profile.
+---
 
-5.  Các thực thể profile được lưu vào **Entity Resolution Service (PostgreSQL)**.
+### 🛠 Case cụ thể bạn có thể làm với PostgreSQL mà NoSQL khó:
 
-6.  Logic nhận dạng thực thể chạy trong **PostgreSQL** để hợp nhất các thực thể profile thành các thực thể duy nhất.
+| Use Case | PostgreSQL | NoSQL |
+|----------|------------|-------|
+| Match theo logic `IF email match OR (phone + name match)` | ✅ Rất dễ với CTE + IF | ❌ Phải xử lý ở app |
+| Fuzzy match tên hoặc địa chỉ | ✅ Với `pg_trgm`, `SIMILARITY()` | 🔶 Có thể với plugin | 
+| Truy xuất & debug logic match cụ thể | ✅ Truy vấn log & trace đơn giản | ❌ Không rõ ràng |
+| Dynamic rule (config từ bảng) | ✅ Full support | ❌ Khó, phải code lại |
+| So sánh version matching rule qua thời gian | ✅ Dùng audit log hoặc trigger | ❌ Không có native support |
 
-7.  Metadata về các thuộc tính profile được quản lý và cập nhật thông qua **CDP Admin DB** và **F1: Profile Attributes (Lambda)**.
 
-8.  Khi quá trình nhận dạng hoàn tất, một sự kiện thông báo được gửi qua **AWS SNS / Apache Kafka**.
+---
 
-9.  **F3: Notify event: Resolution is finished (Lambda)** nhận thông báo và thực hiện các hành động cần thiết (ví dụ: thông báo cho các hệ thống khác).
+## ⚡ Kết quả: Real-time AI Agentic Engagement
 
-10. Các kênh **Real-time Engagement Channels / AI Agents** sử dụng dữ liệu thực thể đã giải quyết và các sự kiện thông báo để tương tác với khách hàng.
+Khi danh tính được phân giải thành công:
+- System sẽ notify qua **SNS hoặc Kafka topic**
+- Các **AI Agent** (Zalo, SMS, Web notification,...) có thể tự động gửi message đúng lúc, đúng người
 
-## Quá Trình Nhận Dạng Thực Thể trong Database
+---
 
-Quá trình nhận dạng thực thể chi tiết được thực thi trong cơ sở dữ liệu PostgreSQL bao gồm các bước:
+## 🧩 Mở rộng & Báo cáo
 
-1. **Raw Data Ingestion:** Dữ liệu thô được đưa vào database (từ F2 Lambda).
+- Dữ liệu có thể truy vấn real-time qua **Superset** hoặc Athena
+- Dashboard phân tích & insight người dùng sẽ luôn cập nhật theo thời gian thực
 
-2. **Initiate Resolution:** Bắt đầu quá trình nhận dạng (có thể bằng trigger hoặc lịch trình).
+---
 
-3. **Select Data for Processing:** Chọn các bản ghi dữ liệu thô cần xử lý (ví dụ: các bản ghi mới hoặc chưa xử lý).
+# 📌 Tổng Kết:
 
-4. **Load Existing Context & Rules:** Tải các thực thể đã có và các quy tắc nhận dạng (từ bảng master, links, và profile attributes).
+✅ PostgreSQL 16 là một lựa chọn **rất thực tế** cho bài toán Identity Resolution:  
+- Scale tốt  
+- Logic mạnh  
+- Không vendor lock-in  
+- Hỗ trợ rule động
 
-5. **Execute Resolution Logic:** Thực thi logic so sánh, ghép nối và đưa ra quyết định hợp nhất.
-
-6. **Persist Resolved State:** Lưu trạng thái đã giải quyết (cập nhật master profiles, ghi links).
-
-7. **Finalize Source Data:** Đánh dấu hoặc xử lý dữ liệu thô đã được xử lý.
-
-8. **Expose Resolved Data:** Chuẩn bị dữ liệu đã giải quyết cho các hệ thống tiêu thụ.
-
-## Phân tích Dữ liệu
-
-- Dữ liệu thô trong **Raw Data Lake (S3)** có thể được truy vấn trực tiếp bằng **AWS Athena** cho các báo cáo Ad-hoc.
-
-- Dữ liệu thực thể đã giải quyết trong **PostgreSQL** có thể được truy cập bởi **Apache Superset** hoặc các **Analytics Dashboard** khác để phân tích bởi **Data Analyst**.
-
-- **ElastiCache** có thể tăng tốc truy vấn cho các dữ liệu thường xuyên được truy cập.
-
-Giải pháp này cung cấp một framework toàn diện cho nhận dạng thực thể theo thời gian thực, tận dụng nhiều dịch vụ quản lý của AWS để đảm bảo khả năng mở rộng, độ tin cậy và hiệu suất
+🔥 Kiến trúc có thể chạy hoàn toàn trên AWS stack hoặc open-source 100%. Tùy vào định hướng đội ngũ và ngân sách.
