@@ -6,7 +6,7 @@ DECLARE
 BEGIN
     BEGIN
        
-		RAISE WARNING 'PERFORM resolve_customer_identities_dynamic. now_datetime: % ', now_datetime;
+		RAISE NOTICE 'PERFORM resolve_customer_identities_dynamic. now_datetime: % ', now_datetime;
 		
 		-- Update last_executed_at timestamp
 		UPDATE cdp_id_resolution_status
