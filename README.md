@@ -80,7 +80,8 @@ Kiến trúc giải pháp bao gồm các luồng dữ liệu chính: thu thập 
 8.  **CDP Admin DB:** Cơ sở dữ liệu quản trị cho Nền tảng Dữ liệu Khách hàng (CDP), có thể lưu trữ các cấu hình và dữ liệu quản trị khác.
 
 9.  **F1: Profile Attributes (Lambda):**
-    Một Lambda function có nhiệm vụ cập nhật metadata vào bảng `profile_attributes` trong Entity Resolution Service DB. Dữ liệu metadata này được lấy từ CDP Admin DB.
+    Một Lambda function có nhiệm vụ tạo tables, triggers và metadata của Identity Resulution bằng tất cả SQL files trong sql-tests. 
+    Sau đó, định kỳ F1 Lambda sẽ cập nhật metadata vào bảng `cdp_profile_attributes` trong Entity Resolution Service DB từ CDP Admin DB
 
         Flow:
         CDP Admin -> CDP Admin DB -> F1 Lambda -> Bảng `profile_attributes` (trong Entity Resolution Service DB)
