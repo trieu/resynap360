@@ -18,6 +18,7 @@ Khách hàng tương tác qua app, web, hoặc thiết bị IoT. Tracking JS s�
 - HTTP endpoint (tự host bằng FastAPI, Express,...) với NginX hay AWS ALB
 
 ### 2️⃣ **Firehose hoặc Kafka**  
+
 Sự kiện được đẩy vào hệ thống thu thập:
 - **AWS Firehose**: dễ dùng, tích hợp sẵn với S3, Redshift, OpenSearch
 - **Apache Kafka**: chủ động hơn, phù hợp nếu bạn đã có hạ tầng Open Source
@@ -26,7 +27,9 @@ Sự kiện được đẩy vào hệ thống thu thập:
 Mọi event gốc đều được lưu xuống Data Lake để audit, training model hoặc query ad-hoc.
 
 ### 4️⃣ **Lambda Function (F2: Event to Entity)**  
+
 Lambda/worker backend sẽ:
+
 - Kéo dữ liệu từ Kafka/Firehose
 - Chuẩn hóa và mapping field
 - Build các **customer profile entity**
@@ -59,8 +62,6 @@ Lý do chọn **PostgreSQL 16+** là vì:
 ### ✅ **5. Không lock-in vendor, dễ migrate**
 - Dù deploy trên RDS, Aurora hay PostgreSQL open-source đều được
 - Linh hoạt giữa AWS và on-premises/Open Source infra
-
----
 
 ## ❌ Tại sao không dùng MongoDB / DynamoDB / Elasticsearch cho Identity Resolution?
 
