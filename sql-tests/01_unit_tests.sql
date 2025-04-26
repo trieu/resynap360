@@ -30,3 +30,9 @@ INSERT INTO cdp_raw_profiles_stage (
 (gen_random_uuid(), 'Jane', 'Doe', 'jane.d@example.com', '5551234567', '456 Oak Ave', 'Los Angeles', 'CA', '90001', 'SystemA', NULL),
 (gen_random_uuid(), 'Janet', 'Do', 'jane.d@example.com', '5551234567', '456 Oak Ave', 'Los Angeles', 'CA', '90001', 'SystemB', NULL),
 (gen_random_uuid(), 'Mike', 'Tyson', NULL, '8889990000', '789 Pine Rd', 'Chicago', 'IL', '60601', 'SystemC', NULL);
+
+INSERT INTO cdp_raw_profiles_stage (
+    raw_profile_id, first_name, last_name, email, phone_number,
+    address_line1, city, state, zalo_user_id, source_system, processed_at
+) VALUES
+(gen_random_uuid(), 'Trieu', 'Nguyen', '', '09031229', 'Q6', '', 'Vietnam', '456', 'Zalo', NULL);

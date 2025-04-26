@@ -83,6 +83,7 @@ BEGIN
                 WHEN 'email' THEN v_raw_value_text := r_profile.email::TEXT;
                 WHEN 'phone_number' THEN v_raw_value_text := r_profile.phone_number::TEXT;
                 WHEN 'address_line1' THEN v_raw_value_text := r_profile.address_line1::TEXT;
+                WHEN 'zalo_user_id' THEN v_raw_value_text := r_profile.zalo_user_id::TEXT;
                 ELSE
                     RAISE WARNING 'Unsupported attribute in config: "%"', v_identity_config_rec.attr_code;
                     CONTINUE;
@@ -152,6 +153,7 @@ BEGIN
             UPDATE cdp_master_profiles mp
             SET
                 first_name = COALESCE(mp.first_name, r_profile.first_name),
+                last_name = COALESCE(mp.last_name, r_profile.last_name),
                 email = COALESCE(mp.email, r_profile.email),
                 phone_number = COALESCE(mp.phone_number, r_profile.phone_number),
                 address_line1 = COALESCE(mp.address_line1, r_profile.address_line1),

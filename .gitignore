@@ -7,6 +7,9 @@
 node_modules/
 dist/
 
+*.cdp_dev
+*.Mycatisfat!~3775
+
 # Compiled Java class files
 *.class
 
