@@ -1,4 +1,0 @@
-psycopg
-phonenumbers
-python-dotenv
-kafka-python

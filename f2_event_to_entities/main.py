@@ -1,74 +1,106 @@
+import base64
 import json
-import phonenumbers
-import psycopg
 import os
-from dotenv import load_dotenv
 
-# Load environment variables from a .env file (useful in development)
-load_dotenv()
+import psycopg2
 
-# Environment variables for Aurora PostgreSQL connection
-DB_HOST = os.getenv('DB_HOST')
-DB_PORT = os.getenv('DB_PORT')
-DB_NAME = os.getenv('DB_NAME')
-DB_USER = os.getenv('DB_USER')
-DB_PASSWORD = os.getenv('DB_PASSWORD')
+from processor import get_db_credentials, validate_phone_number, save_to_postgresql
 
-def validate_phone_number(phone_number):
-    """Check if the phone number is valid using phonenumbers library."""
-    try:
-        parsed_number = phonenumbers.parse(phone_number)
-        return phonenumbers.is_valid_number(parsed_number)
-    except phonenumbers.phonenumberutil.NumberParseException:
-        return False
+# --- Configuration ---
+# Use environment variables configured in the Lambda function
+SECRET_NAME = os.environ.get('SECRET_NAME')
+AWS_REGION = os.environ.get('AWS_REGION', 'ap-southeast-1')
 
-def save_to_aurora(phone_number):
-    """Saves the phone number into Aurora PostgreSQL."""
-    try:
-        # Async DB connection (can be replaced with sync if needed)
-        with psycopg.connect(
-            f"dbname={DB_NAME} user={DB_USER} password={DB_PASSWORD} host={DB_HOST} port={DB_PORT}"
-        ) as conn:
-            with conn.cursor() as cursor:
-                # Assuming there's a table `phone_numbers` with a column `phone_number`
-                insert_query = "INSERT INTO phone_numbers (phone_number) VALUES (%s)"
-                cursor.execute(insert_query, (phone_number,))
-                conn.commit()
 
-    except Exception as e:
-        print(f"Error saving to Aurora: {e}")
-        raise
+# --- Lambda Handler ---
 
 def lambda_handler(event, context):
-    """Main Lambda handler to process Firehose event."""
-    print('Loading function')
-    
-    # Process the list of records and transform them
-    print(json.dumps(event))  # Log the entire event for debugging
+    print("🔥 Lambda triggered by Firehose")
+
+    records = event.get("records", [])
     output = []
+    db_connection = None # Initialize connection to None
 
-    for record in event['records']:
-        # Decode the record data (assuming it's base64 encoded in the event)
-        data = json.loads(record['data'])  # Assuming data is JSON encoded in the Firehose stream
-        phone_number = data.get('phone_number', None)
+    # Validate configuration
+    if not SECRET_NAME:
+         print("[ERROR] SECRET_NAME environment variable not set.")
+         # Mark all records as failed due to configuration error
+         return {"records": [{"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']} for r in records]}
 
-        # Validate the phone number and save it to Aurora if valid
-        if phone_number and validate_phone_number(phone_number):
-            print(f"Valid phone number: {phone_number}")
-            save_to_aurora(phone_number)
-            result = 'Ok'
-        else:
-            print(f"Invalid phone number: {phone_number}")
-            result = 'Failed'
 
-        output.append({
-            'recordId': record['recordId'],
-            'result': result,
-            'data': record['data']
-        })
-    
-    # Log the number of successful records
-    print(f"Processing completed. Successful records: {len(output)}.")
-    
-    # Return the output in the expected format
-    return {'records': output}
+    # Get DB credentials and connect
+    try:
+        creds = get_db_credentials(SECRET_NAME, AWS_REGION)
+        db_connection = psycopg2.connect(
+            host=creds.get('host'),
+            database=creds.get('dbname'),
+            user=creds.get('username'),
+            password=creds.get('password'),
+            port=creds.get('port', 5432)
+        )
+        print("✅ Database connection successful.")
+    except Exception as e:
+        print(f"[FATAL] DB connection failed: {str(e)}")
+        # Mark all records as failed due to connection error
+        return {"records": [{"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']} for r in records]}
+
+    # Process records from Firehose
+    for record in records:
+        record_id = record.get("recordId", "N/A") # Get recordId safely
+        print(f"✨ Processing record: {record_id}")
+        try:
+            # 1. Decode and Parse Data
+            decoded_bytes = base64.b64decode(record['data'])
+            decoded_str = decoded_bytes.decode('utf-8')
+            event_data = json.loads(decoded_str)
+            profile = event_data.get("profile_traits", {})
+
+            # 2. Validate Data (Missing fields & Phone Number)
+            phone_number = profile.get("phone")
+            first_name = profile.get("firstname")
+
+            if not first_name:
+                 raise ValueError("Missing required field: firstname")
+
+            if not validate_phone_number(phone_number):
+                 # Decide how to handle invalid/missing phone numbers.
+                 # Raising an error here marks the record as failed.
+                 # Alternatively, you could log a warning and proceed without the phone number
+                 # if the DB schema allows NULL or you have a default value.
+                 raise ValueError(f"Invalid or missing phone number: '{phone_number}'")
+
+            # 3. Save to Database
+            # We pass the established connection to the save function
+            save_to_postgresql(profile, db_connection)
+            print(f"✅ Record saved for ID: {record_id}")
+
+            # 4. Append successful result
+            output.append({
+                "recordId": record_id,
+                "result": "Ok",
+                "data": record["data"] # Return the original data for 'Ok' records
+            })
+
+        except Exception as e:
+            # Catch any error during processing of a single record
+            print(f"[ERROR] Failed to process record {record_id}: {str(e)}")
+            # 5. Append failed result
+            output.append({
+                "recordId": record_id,
+                "result": "ProcessingFailed",
+                # It's good practice to return the original data for failed records
+                # so Firehose can potentially retry or send it to a failure destination.
+                "data": record["data"]
+            })
+
+    # Close the database connection after processing all records
+    if db_connection:
+        try:
+            db_connection.close()
+            print("✅ Database connection closed.")
+        except Exception as e:
+            print(f"[WARN] Error closing database connection: {str(e)}")
+
+
+    print(f"✅ Batch processing complete. Total records processed: {len(output)}")
+    return {"records": output}

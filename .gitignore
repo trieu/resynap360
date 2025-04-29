@@ -9,6 +9,8 @@ dist/
 
 # python env
 env 
+*/dependencies
+
 *.cdp_dev
 *.Mycatisfat!~3775
 

@@ -6,26 +6,31 @@ content-type: application/json
 accept: application/json
 
 {
-  "schema_version": "2025.02.28",
-  "event_id": "e5f67891-1234-5678-9abc-3213131",
+  "schema_version": "2025.04.28",
+  "event_id": "a1234567-b89c-1234-d567-ef8901234567",
   "tenant_id": "PNJ",
-  "datetime": "2025-04-28T10:13:00.000Z",
-  "unix_timestamp": 1740737580000,
-  "metric": "login",
-  "visid": "c4d5e6f7-8901-2345-6789-abcdef012345",
+  "datetime": "2025-04-28T10:00:00Z",
+  "unix_timestamp": 1740736800000,
+  "metric": "identify",
+  "visid": "b2345678-c90d-2345-e678-f90123456789",
   "mediahost": "www.pnj.com.vn",
   "tpurl": "https://www.pnj.com.vn/",
   "profile_traits": {
-    "customer_id": "CUST7890",
-    "phone": "0903122290",
-    "firstname": "Trieu",
-    "tax_id": "0316233152"
+    "phone": "0903123456",
+    "firstname": "Triệu",
+    "gender": "male",
+    "dob": "1990-05-20",
+    "loyalty_level": "gold",
+    "email": "trieu@example.com",
+    "metadata": {
+      "referrer": "facebook_ad"
+    }
   },
   "utmdata": {
-    "utmsource": "vnexpress",
+    "utmsource": "facebook",
     "utmmedium": "cpc",
-    "utmcampaign": "promo-campaign",
-    "utmterm": "discount",
-    "utmcontent": "banner1"
+    "utmcampaign": "summer_sale",
+    "utmterm": "jewelry+sale",
+    "utmcontent": "image_ad_01"
   }
 }
