@@ -82,10 +82,7 @@ BEGIN
                 WHEN 'phone_number' THEN v_raw_value_text := r_profile.phone_number::TEXT;
                 WHEN 'crm_id' THEN v_raw_value_text := r_profile.crm_id::TEXT;
                 WHEN 'zalo_user_id' THEN v_raw_value_text := r_profile.zalo_user_id::TEXT;
-                WHEN 'first_name' THEN v_raw_value_text := r_profile.first_name::TEXT;
-                WHEN 'last_name' THEN v_raw_value_text := r_profile.last_name::TEXT;
                 WHEN 'email' THEN v_raw_value_text := r_profile.email::TEXT;                
-                WHEN 'address_line1' THEN v_raw_value_text := r_profile.address_line1::TEXT;
                 ELSE
                     -- Attempt to fetch from ext_attributes JSONB
                     BEGIN
