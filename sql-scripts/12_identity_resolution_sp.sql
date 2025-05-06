@@ -57,7 +57,7 @@ BEGIN
 
     -- If no config found, skip
     IF identity_configs_array IS NULL OR array_length(identity_configs_array, 1) IS NULL THEN
-        RAISE WARNING 'Config table cdp_profile_attributes is empty. Skipping resolve_customer_identities_dynamic.';
+        RAISE WARNING 'Config table cdp_profile_attributes is empty. Skipping resolve_customer_identities_dynamic. Exiting';
         RETURN;
     END IF;
 
@@ -78,15 +78,23 @@ BEGIN
 
             -- 3.1 Map attribute code to actual column values in raw profile
             CASE v_identity_config_rec.attr_code
+                WHEN 'web_visitor_id' THEN v_raw_value_text := r_profile.web_visitor_id::TEXT;
+                WHEN 'phone_number' THEN v_raw_value_text := r_profile.phone_number::TEXT;
+                WHEN 'crm_id' THEN v_raw_value_text := r_profile.crm_id::TEXT;
+                WHEN 'zalo_user_id' THEN v_raw_value_text := r_profile.zalo_user_id::TEXT;
                 WHEN 'first_name' THEN v_raw_value_text := r_profile.first_name::TEXT;
                 WHEN 'last_name' THEN v_raw_value_text := r_profile.last_name::TEXT;
-                WHEN 'email' THEN v_raw_value_text := r_profile.email::TEXT;
-                WHEN 'phone_number' THEN v_raw_value_text := r_profile.phone_number::TEXT;
+                WHEN 'email' THEN v_raw_value_text := r_profile.email::TEXT;                
                 WHEN 'address_line1' THEN v_raw_value_text := r_profile.address_line1::TEXT;
-                WHEN 'zalo_user_id' THEN v_raw_value_text := r_profile.zalo_user_id::TEXT;
                 ELSE
-                    RAISE WARNING 'Unsupported attribute in config: "%"', v_identity_config_rec.attr_code;
-                    CONTINUE;
+                    -- Attempt to fetch from ext_attributes JSONB
+                    BEGIN
+                        SELECT ext_attributes ->> v_identity_config_rec.attr_code
+                        INTO v_raw_value_text;
+                    EXCEPTION
+                        WHEN OTHERS THEN
+                            RAISE WARNING 'Unsupported attribute or ext_attributes missing: "%" - Error: %', v_identity_config_rec.attr_code, SQLERRM;
+                    END;
             END CASE;
 
             -- 3.2 Validate the raw value before creating match conditions
@@ -140,7 +148,7 @@ BEGIN
             END;
         END IF;
 
-        -- 5. Process result: update or insert master profile, then link
+        -- 5. Link raw to matched or insert new master
         IF matched_master_id IS NOT NULL THEN
             -- 5.1 Match found: update master profile and insert link
             BEGIN
@@ -160,7 +168,15 @@ BEGIN
                 city = COALESCE(mp.city, r_profile.city),
                 state = COALESCE(mp.state, r_profile.state),
                 zip_code = COALESCE(mp.zip_code, r_profile.zip_code),
-                source_systems = array_append(mp.source_systems, r_profile.source_system),
+                source_systems = (
+                    SELECT array_agg(DISTINCT elem)
+                    FROM unnest(mp.source_systems || r_profile.source_system) AS elem
+                ),
+                web_visitor_ids = (
+                    SELECT array_agg(DISTINCT elem)
+                    FROM unnest(mp.web_visitor_ids || r_profile.web_visitor_id) AS elem
+                ),
+                tenant_id = COALESCE(mp.tenant_id, r_profile.tenant_id),
                 updated_at = NOW()
             WHERE mp.master_profile_id = matched_master_id;
 
@@ -169,7 +185,7 @@ BEGIN
             INSERT INTO cdp_master_profiles (
                 first_name, last_name, email, phone_number,
                 address_line1, city, state, zip_code,
-                source_systems, first_seen_raw_profile_id
+                source_systems, first_seen_raw_profile_id, web_visitor_ids, tenant_id
             )
             VALUES (
                 r_profile.first_name,
@@ -181,7 +197,9 @@ BEGIN
                 r_profile.state,
                 r_profile.zip_code,
                 ARRAY[r_profile.source_system],
-                r_profile.raw_profile_id
+                r_profile.raw_profile_id,
+                ARRAY[r_profile.web_visitor_id],
+                r_profile.tenant_id
             )
             RETURNING master_profile_id INTO matched_master_id;
 

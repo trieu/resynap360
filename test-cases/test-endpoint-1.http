@@ -9,28 +9,28 @@ accept: application/json
   "schema_version": "2025.04.28",
   "event_id": "a1234567-b89c-1234-d567-ef8901234567",
   "tenant_id": "PNJ",
-  "datetime": "2025-04-28T10:00:00Z",
+  "datetime": "2025-05-06T04:00:00Z",
   "unix_timestamp": 1740736800000,
   "metric": "identify",
   "visid": "b2345678-c90d-2345-e678-f90123456789",
   "mediahost": "www.pnj.com.vn",
   "tpurl": "https://www.pnj.com.vn/",
   "profile_traits": {
-    "phone": "0903123456",
-    "firstname": "Triệu",
+    "phone": "02839951703",
+    "firstname": "Thomas",
+    "lastname": "Nguyen",
     "gender": "male",
     "dob": "1990-05-20",
     "loyalty_level": "gold",
     "email": "trieu@example.com",
+    "source_system": "website",
+    "address_line1":"Phu Lam B",
+    "city":"Hochiminh City",
     "metadata": {
-      "referrer": "facebook_ad"
+      "referrer": ""
     }
   },
   "utmdata": {
-    "utmsource": "facebook",
-    "utmmedium": "cpc",
-    "utmcampaign": "summer_sale",
-    "utmterm": "jewelry+sale",
-    "utmcontent": "image_ad_01"
+   
   }
 }

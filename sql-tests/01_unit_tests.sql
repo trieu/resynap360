@@ -10,9 +10,12 @@ INSERT INTO cdp_profile_attributes (
 ) VALUES
 (1, 'email', 'email', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
 (2, 'phone_number','phone_number', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
-(3,'first_name',  'first_name', 'TEXT', TRUE, 'fuzzy_dmetaphone', NULL, 'most_recent', 'ACTIVE', FALSE),
-(4,'last_name', 'last_name', 'TEXT', TRUE, 'fuzzy_trgm', 0.7, 'most_recent', 'ACTIVE', FALSE),
-(5,'zalo_user_id', 'zalo_user_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE);
+(3,'first_name',  'first_name', 'TEXT', FALSE, 'fuzzy_dmetaphone', NULL, 'most_recent', 'ACTIVE', FALSE),
+(4,'last_name', 'last_name', 'TEXT', FALSE, 'fuzzy_trgm', 0.7, 'most_recent', 'ACTIVE', FALSE),
+(5,'zalo_user_id', 'zalo_user_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
+(6,'web_visitor_id', 'web_visitor_id', 'TEXT', TRUE, 'exact',NULL, 'most_recent', 'ACTIVE', TRUE),
+(7,'crm_id', 'crm_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
+;
 
 
 -- Clear existing raw profiles

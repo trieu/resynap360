@@ -1,106 +1,120 @@
 import base64
 import json
 import os
-
 import psycopg2
+import socket
+from processor import validate_phone_number, save_to_postgresql
 
-from processor import get_db_credentials, validate_phone_number, save_to_postgresql
+# --- Configuration from environment variables ---
+DB_HOST = os.environ.get("DB_HOST")
+DB_NAME = os.environ.get("DB_NAME")
+DB_USER = os.environ.get("DB_USER")
+DB_PASS = os.environ.get("DB_PASS")
+DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
-# --- Configuration ---
-# Use environment variables configured in the Lambda function
-SECRET_NAME = os.environ.get('SECRET_NAME')
-AWS_REGION = os.environ.get('AWS_REGION', 'ap-southeast-1')
-
-
-# --- Lambda Handler ---
 
 def lambda_handler(event, context):
-    print("🔥 Lambda triggered by Firehose")
+    print("🔥 [START] Lambda triggered by Firehose version 2025.05.06-09.41")
 
     records = event.get("records", [])
     output = []
-    db_connection = None # Initialize connection to None
+    db_connection = None
 
-    # Validate configuration
-    if not SECRET_NAME:
-         print("[ERROR] SECRET_NAME environment variable not set.")
-         # Mark all records as failed due to configuration error
-         return {"records": [{"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']} for r in records]}
+    # --- Validate Configuration ---
+    missing_env = [var for var in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASS"] if not os.environ.get(var)]
+    if missing_env:
+        print(f"[CONFIG ERROR] Missing environment variables: {missing_env}")
+        return {
+            "records": [
+                {"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']}
+                for r in records
+            ]
+        }
 
-
-    # Get DB credentials and connect
+    # --- Check Reachability & Connect ---
     try:
-        creds = get_db_credentials(SECRET_NAME, AWS_REGION)
-        db_connection = psycopg2.connect(
-            host=creds.get('host'),
-            database=creds.get('dbname'),
-            user=creds.get('username'),
-            password=creds.get('password'),
-            port=creds.get('port', 5432)
-        )
-        print("✅ Database connection successful.")
-    except Exception as e:
-        print(f"[FATAL] DB connection failed: {str(e)}")
-        # Mark all records as failed due to connection error
-        return {"records": [{"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']} for r in records]}
+        print(f"[DEBUG] Attempting to reach DB at {DB_HOST}:{DB_PORT}")
+        socket.create_connection((DB_HOST, DB_PORT), timeout=3)
+        print(f"✅ [REACHABLE] Host {DB_HOST}:{DB_PORT} is reachable")
 
-    # Process records from Firehose
+        db_connection = psycopg2.connect(
+            host=DB_HOST,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            port=DB_PORT,
+            connect_timeout=5
+        )
+        with db_connection.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            _ = cursor.fetchone()
+        print("✅ [DB CONNECT] Connection and health check successful.")
+    except Exception as e:
+        print(f"[FATAL] Database connection or health check failed: {str(e)}")
+        return {
+            "records": [
+                {"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']}
+                for r in records
+            ]
+        }
+
+    # --- Process Each Record ---
     for record in records:
-        record_id = record.get("recordId", "N/A") # Get recordId safely
-        print(f"✨ Processing record: {record_id}")
+        record_id = record.get("recordId", "N/A")
+        print(f"✨ [PROCESSING] Record ID: {record_id}")
+
         try:
-            # 1. Decode and Parse Data
             decoded_bytes = base64.b64decode(record['data'])
             decoded_str = decoded_bytes.decode('utf-8')
             event_data = json.loads(decoded_str)
+            tenant_id = event_data.get("tenant_id")
+            web_visitor_id = event_data.get("visid")
             profile = event_data.get("profile_traits", {})
+            
+            # Add tenant_id into the profile if available
+            if tenant_id:
+                profile["tenant_id"] = tenant_id
 
-            # 2. Validate Data (Missing fields & Phone Number)
+            # Add web_visitor_id into the profile if available
+            if web_visitor_id:
+                profile["web_visitor_id"] = web_visitor_id
+            
+            # check for phone_number
             phone_number = profile.get("phone")
+            if phone_number and not validate_phone_number(phone_number):
+                raise ValueError(f"Invalid or missing phone number: '{phone_number}'")
+
+
+            # check for phone_number
             first_name = profile.get("firstname")
+            if first_name and not first_name:
+                raise ValueError("Missing required field: firstname")
+            
 
-            if not first_name:
-                 raise ValueError("Missing required field: firstname")
-
-            if not validate_phone_number(phone_number):
-                 # Decide how to handle invalid/missing phone numbers.
-                 # Raising an error here marks the record as failed.
-                 # Alternatively, you could log a warning and proceed without the phone number
-                 # if the DB schema allows NULL or you have a default value.
-                 raise ValueError(f"Invalid or missing phone number: '{phone_number}'")
-
-            # 3. Save to Database
-            # We pass the established connection to the save function
             save_to_postgresql(profile, db_connection)
-            print(f"✅ Record saved for ID: {record_id}")
+            print(f"✅ [SAVED] Record ID: {record_id}")
 
-            # 4. Append successful result
             output.append({
                 "recordId": record_id,
                 "result": "Ok",
-                "data": record["data"] # Return the original data for 'Ok' records
-            })
-
-        except Exception as e:
-            # Catch any error during processing of a single record
-            print(f"[ERROR] Failed to process record {record_id}: {str(e)}")
-            # 5. Append failed result
-            output.append({
-                "recordId": record_id,
-                "result": "ProcessingFailed",
-                # It's good practice to return the original data for failed records
-                # so Firehose can potentially retry or send it to a failure destination.
                 "data": record["data"]
             })
 
-    # Close the database connection after processing all records
+        except Exception as e:
+            print(f"[ERROR] Record ID {record_id} failed: {str(e)}")
+            output.append({
+                "recordId": record_id,
+                "result": "ProcessingFailed",
+                "data": record["data"]
+            })
+
+    # --- Close Connection ---
     if db_connection:
         try:
             db_connection.close()
-            print("✅ Database connection closed.")
+            print("✅ [DB CLOSED] Connection closed cleanly.")
         except Exception as e:
-            print(f"[WARN] Error closing database connection: {str(e)}")
+            print(f"[WARN] Error while closing DB connection: {str(e)}")
 
-
-    print(f"✅ Batch processing complete. Total records processed: {len(output)}")
+    print(f"✅ [COMPLETE] Processed {len(output)} records.")
     return {"records": output}
