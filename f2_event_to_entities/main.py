@@ -80,15 +80,15 @@ def lambda_handler(event, context):
                 profile["web_visitor_id"] = web_visitor_id
             
             # check for phone_number
-            phone_number = profile.get("phone")
+            phone_number = profile.get("phone_number")
             if phone_number and not validate_phone_number(phone_number):
-                raise ValueError(f"Invalid or missing phone number: '{phone_number}'")
+                raise ValueError(f"Invalid or missing phone_number number: '{phone_number}'")
 
 
             # check for phone_number
-            first_name = profile.get("firstname")
+            first_name = profile.get("first_name")
             if first_name and not first_name:
-                raise ValueError("Missing required field: firstname")
+                raise ValueError("Missing required field: first_name")
             
 
             save_to_postgresql(profile, db_connection)

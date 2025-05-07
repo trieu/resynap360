@@ -2,35 +2,32 @@
 # this is a test in stagging 
 POST https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track HTTP/1.1
 user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
-content-type: application/json
-accept: application/json
+Content-Type: application/json
+Accept: application/json
 
 {
   "schema_version": "2025.04.28",
-  "event_id": "a1234567-b89c-1234-d567-ef8901234567",
+  "event_id": "5ed708ca-a682-4c26-969b-5c339554b5ea",
   "tenant_id": "PNJ",
   "datetime": "2025-05-06T04:00:00Z",
-  "unix_timestamp": 1740736800000,
+  "unix_timestamp": 1746529570870,
   "metric": "identify",
-  "visid": "b2345678-c90d-2345-e678-f90123456789",
+  "visid": "2b02723f-2dcb-440b-8498-532331d76e8e",
   "mediahost": "www.pnj.com.vn",
   "tpurl": "https://www.pnj.com.vn/",
   "profile_traits": {
-    "phone": "02839951703",
-    "firstname": "Thomas",
-    "lastname": "Nguyen",
+    "phone_number": "02839951702",
+    "first_name": "Trieu",
+    "last_name": "Nguyen",
     "gender": "male",
-    "dob": "1990-05-20",
+    "date_of_birth": "1990-05-20",
     "loyalty_level": "gold",
     "email": "trieu@example.com",
-    "source_system": "website",
-    "address_line1":"Phu Lam B",
-    "city":"Hochiminh City",
-    "metadata": {
-      "referrer": ""
+    "source_system": "ecommerce",
+    "address_line1": "Phu Lam B",
+    "city": "Hochiminh City",
+    "ext_attributes": {
+      
     }
-  },
-  "utmdata": {
-   
   }
 }

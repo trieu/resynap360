@@ -33,9 +33,9 @@
 
 *(Giả sử **object_id** = 1 tương ứng với đối tượng "Customer")*
 
-1.  **firstName (Tên):**
+1.  **first_name (Tên):**
     *   **id**: 1
-    *   **attribute_internal_code**: "firstName"
+    *   **attribute_internal_code**: "first_name"
     *   **name**: "Tên"
     *   **status**: 'ACTIVE'
     *   **data_type**: "VARCHAR"

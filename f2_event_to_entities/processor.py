@@ -4,6 +4,7 @@ import boto3
 from botocore.exceptions import ClientError
 import phonenumbers
 import psycopg2
+from psycopg2.extras import Json
 import html
 import re
 import json
@@ -21,7 +22,7 @@ def sanitize_input(value):
     return value
 
 def validate_phone_number(phone_number_str):
-    """Validate Vietnamese phone numbers, even if no country code is provided."""
+    """Validate Vietnamese phone_number numbers, even if no country code is provided."""
     if not phone_number_str:
         return False
     try:
@@ -29,13 +30,13 @@ def validate_phone_number(phone_number_str):
         parsed_number = phonenumbers.parse(phone_number_str, "VN")
         is_valid = phonenumbers.is_valid_number(parsed_number)
         if not is_valid:
-            print(f"[DEBUG] Invalid phone number format: {phone_number_str}")
+            print(f"[DEBUG] Invalid phone_number number format: {phone_number_str}")
         return is_valid
     except phonenumbers.phonenumberutil.NumberParseException as e:
         print(f"[DEBUG] NumberParseException for '{phone_number_str}': {e}")
         return False
     except Exception as e:
-        print(f"[WARN] Error parsing phone number '{phone_number_str}': {e}")
+        print(f"[WARN] Error parsing phone_number number '{phone_number_str}': {e}")
         return False
 
 
@@ -91,50 +92,85 @@ def get_db_credentials(secret_name, region_name):
 # even if later records in the batch fail.
 
 
-
-
 def save_to_postgresql(profile, connection):
-    """Upserts a single sanitized profile into PostgreSQL based on (tenant_id, web_visitor_id)."""
+    """
+    Upserts a sanitized profile into PostgreSQL based on (tenant_id, web_visitor_id).
+    Assumes a UNIQUE constraint exists on (tenant_id, web_visitor_id).
+    """
     try:
         with connection.cursor() as cursor:
             upsert_query = """
                 INSERT INTO public.cdp_raw_profiles_stage (
-                    tenant_id, first_name, last_name, email, phone_number, zalo_user_id, web_visitor_id, 
-                    crm_id, address_line1, city, state, zip_code, source_system, ext_attributes, received_at
+                    raw_profile_id, tenant_id, first_name, last_name, gender, date_of_birth,
+                    email, phone_number, zalo_user_id, web_visitor_id, crm_id,
+                    address_line1, address_line2, city, state, zip_code,
+                    last_seen_at, last_seen_touchpoint_id, last_known_channel, total_sessions,
+                    preferred_language, preferred_currency, preferred_communication,
+                    source_system, ext_attributes, received_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                VALUES (
+                    COALESCE(%s, gen_random_uuid()), %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s,
+                    %s, %s, %s,
+                    %s, %s, NOW()
+                )
                 ON CONFLICT (tenant_id, web_visitor_id) DO UPDATE SET
                     first_name = EXCLUDED.first_name,
                     last_name = EXCLUDED.last_name,
+                    gender = EXCLUDED.gender,
+                    date_of_birth = EXCLUDED.date_of_birth,
                     email = EXCLUDED.email,
                     phone_number = EXCLUDED.phone_number,
                     zalo_user_id = EXCLUDED.zalo_user_id,
                     crm_id = EXCLUDED.crm_id,
                     address_line1 = EXCLUDED.address_line1,
+                    address_line2 = EXCLUDED.address_line2,
                     city = EXCLUDED.city,
                     state = EXCLUDED.state,
                     zip_code = EXCLUDED.zip_code,
+                    last_seen_at = EXCLUDED.last_seen_at,
+                    last_seen_touchpoint_id = EXCLUDED.last_seen_touchpoint_id,
+                    last_known_channel = EXCLUDED.last_known_channel,
+                    total_sessions = EXCLUDED.total_sessions,
+                    preferred_language = EXCLUDED.preferred_language,
+                    preferred_currency = EXCLUDED.preferred_currency,
+                    preferred_communication = EXCLUDED.preferred_communication,
                     source_system = EXCLUDED.source_system,
                     ext_attributes = EXCLUDED.ext_attributes,
                     received_at = NOW(),
                     processed_at = NULL;
             """
+
             values = (
+                sanitize_input(profile.get("raw_profile_id")),
                 sanitize_input(profile.get("tenant_id")),
-                sanitize_input(profile.get("firstname")),
-                sanitize_input(profile.get("lastname")),
+                sanitize_input(profile.get("first_name")),
+                sanitize_input(profile.get("last_name")),
+                sanitize_input(profile.get("gender")),
+                sanitize_input(profile.get("date_of_birth")),
                 sanitize_input(profile.get("email")),
-                sanitize_input(profile.get("phone")),
+                sanitize_input(profile.get("phone_number")),
                 sanitize_input(profile.get("zalo_user_id")),
                 sanitize_input(profile.get("web_visitor_id")),
                 sanitize_input(profile.get("crm_id")),
                 sanitize_input(profile.get("address_line1")),
+                sanitize_input(profile.get("address_line2")),
                 sanitize_input(profile.get("city")),
                 sanitize_input(profile.get("state")),
                 sanitize_input(profile.get("zip_code")),
+                sanitize_input(profile.get("last_seen_at")),
+                sanitize_input(profile.get("last_seen_touchpoint_id")),
+                sanitize_input(profile.get("last_known_channel")),
+                profile.get("total_sessions"),
+                sanitize_input(profile.get("preferred_language")),
+                sanitize_input(profile.get("preferred_currency")),
+                Json(profile.get("preferred_communication") or {}),
                 sanitize_input(profile.get("source_system")),
-                json.dumps(profile.get("ext_attributes") or {})  # Safely serialize JSON
+                Json(profile.get("ext_attributes") or {}),
             )
+
             cursor.execute(upsert_query, values)
             connection.commit()
     except psycopg2.Error as db_error:

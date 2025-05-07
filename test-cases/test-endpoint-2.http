@@ -16,22 +16,25 @@ Accept: application/json
   "mediahost": "www.pnj.com.vn",
   "tpurl": "https://www.pnj.com.vn/",
   "profile_traits": {
-    "phone": "0903122290",
-    "lastname": "Dương",
-    "firstname": "Jane",
-    "gender": "female",
-    "dob": "1983-12-19",
-    "loyalty_level": "bronze",
-    "email": "jane50@example.net",
-    "metadata": {
-      "referrer": "facebook_ad"
+    "phone_number": "02839951703",
+    "first_name": "Thomas",
+    "last_name": "Nguyen",
+    "gender": "male",
+    "date_of_birth": "1990-05-20",
+    "loyalty_level": "gold",
+    "email": "trieu@example.com",
+    "source_system": "ecommerce",
+    "address_line1": "Phu Lam B",
+    "city": "Hochiminh City",
+    "ext_attributes": {
+      "referrer": "google",
+      "utmdata": {
+        "utmsource": "google",
+        "utmmedium": "video",
+        "utmcampaign": "womens_day",
+        "utmterm": "jewelry+sale",
+        "utmcontent": "video_ad_03"
+      }
     }
-  },
-  "utmdata": {
-    "utmsource": "google",
-    "utmmedium": "video",
-    "utmcampaign": "womens_day",
-    "utmterm": "jewelry+sale",
-    "utmcontent": "video_ad_03"
   }
 }

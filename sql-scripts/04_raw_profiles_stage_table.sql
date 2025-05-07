@@ -48,6 +48,32 @@ CREATE TABLE cdp_raw_profiles_stage (
 
 ----------------- ADDITIONAL INDEXING DATA for cdp_raw_profiles_stage -----------------------
 
+-- Main compound index on tenant_id and web_visitor_id for upsert data
+DO $$
+BEGIN
+    -- Drop the existing non-unique index if it exists
+    IF EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_id_web_visitor_id'
+    ) THEN
+        EXECUTE 'DROP INDEX IF EXISTS idx_raw_profiles_stage_tenant_id_web_visitor_id';
+    END IF;
+
+    -- Add a unique constraint (this will implicitly create a unique index)
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE table_schema = 'public'
+          AND table_name = 'cdp_raw_profiles_stage'
+          AND constraint_type = 'UNIQUE'
+          AND constraint_name = 'unique_tenant_web_visitor'
+    ) THEN
+        ALTER TABLE cdp_raw_profiles_stage
+        ADD CONSTRAINT unique_tenant_web_visitor UNIQUE (tenant_id, web_visitor_id);
+    END IF;
+END$$;
+
+
+
 -- Index on web_visitor_id for efficient filtering 
 DO $$
 BEGIN

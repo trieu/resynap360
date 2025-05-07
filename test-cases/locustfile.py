@@ -22,7 +22,7 @@ CDP_TRACK_URL = 'https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev
 fake = Faker('vi_VN')
 # logging.basicConfig(level=logging.INFO) # Avoid re-calling basicConfig
 
-# List of valid Vietnamese mobile phone prefixes
+# List of valid Vietnamese mobile phone_number prefixes
 # These are 3-digit prefixes for 10-digit mobile numbers.
 VIETNAMESE_MOBILE_PREFIXES = [
     # Viettel
@@ -40,7 +40,7 @@ VIETNAMESE_MOBILE_PREFIXES = [
 ]
 
 def generate_vietnamese_phone_number():
-    """Generates a valid 10-digit Vietnamese mobile phone number."""
+    """Generates a valid 10-digit Vietnamese mobile phone_number number."""
     prefix = random.choice(VIETNAMESE_MOBILE_PREFIXES)
     # Mobile numbers are 10 digits long. Prefixes are 3 digits.
     # So, we need 10 - 3 = 7 more random digits.
@@ -107,8 +107,8 @@ class C360User(HttpUser):
         last_name = fake.last_name()
         email = fake.email()
         
-        # generate a valid Vietnamese phone number
-        phone = generate_vietnamese_phone_number()
+        # generate a valid Vietnamese phone_number number
+        phone_number = generate_vietnamese_phone_number()
         
         # date_of_birth from 18 to 60
         dob = fake.date_of_birth(minimum_age=18, maximum_age=60).strftime("%Y-%m-%d") 
@@ -133,9 +133,9 @@ class C360User(HttpUser):
             "mediahost": "www.pnj.com.vn",
             "tpurl": "https://www.pnj.com.vn/",
             "profile_traits": {
-                "phone": phone,
-                "lastname": last_name,
-                "firstname": first_name,
+                "phone_number": phone_number,
+                "last_name": last_name,
+                "first_name": first_name,
                 "gender": fake.random_element(elements=("male", "female")),
                 "dob": dob,
                 "loyalty_level": fake.random_element(elements=("bronze", "silver", "gold", "platinum")),

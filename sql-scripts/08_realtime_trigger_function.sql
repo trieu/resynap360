@@ -1,27 +1,82 @@
--- Trigger function: Checks time interval before invoking identity resolution SP
 CREATE OR REPLACE FUNCTION process_new_raw_profiles_trigger_func()
 RETURNS TRIGGER AS $$
 DECLARE
-    now_datetime  TIMESTAMP WITH TIME ZONE := NOW();
+    _status RECORD;
+    _current_trigger_time TIMESTAMPTZ := NOW();
+    _delay_seconds INTEGER := 5;
 BEGIN
+    -- Attempt to get an exclusive lock on the status row.
+    -- If another transaction has it (meaning another trigger fired and is active),
+    -- this statement will wait until that lock is released.
+    -- This is the primary mechanism for serialization and avoiding race conditions.
     BEGIN
-       
-		RAISE NOTICE 'PERFORM resolve_customer_identities_dynamic. now_datetime: % ', now_datetime;
-		
-		-- Update last_executed_at timestamp
-		UPDATE cdp_id_resolution_status
-        SET last_executed_at = now_datetime
-        WHERE id = TRUE;
-
-		-- Call the identity resolution stored procedure
-		PERFORM resolve_customer_identities_dynamic();
-       
+        SELECT * INTO _status FROM cdp_id_resolution_status WHERE id = TRUE FOR UPDATE;
     EXCEPTION
-        WHEN OTHERS THEN
-            RAISE WARNING 'Trigger error in process_new_raw_profiles_trigger_func: %', SQLERRM;
-            RETURN NULL; -- Let the original INSERT/UPDATE succeed
+        WHEN lock_not_available THEN
+            RAISE NOTICE '[TID:%] Could not acquire lock on cdp_id_resolution_status immediately. Another transaction may hold it. Trigger time: %',
+                         pg_backend_pid(), _current_trigger_time;
+            -- Depending on desired behavior, you might want to retry or simply exit.
+            -- For now, exiting as the other transaction should handle it.
+            RETURN NULL;
     END;
 
+    -- Check if another instance is already marked as processing.
+    -- This handles the case where multiple triggers fired, queued for the FOR UPDATE lock,
+    -- and the first one is now processing. Subsequent ones, after acquiring the lock,
+    -- will see is_processing = TRUE.
+    IF _status.is_processing THEN
+        RAISE NOTICE '[TID:%] SP execution is already in progress or scheduled by another trigger. is_processing=TRUE. Current trigger time: %, Lock holder started at: %',
+                     pg_backend_pid(), _current_trigger_time, _status.processing_started_at;
+        RETURN NULL; -- Do nothing; let the other process complete. The FOR UPDATE lock is released at TX end.
+    END IF;
+
+    -- This trigger instance will handle the execution.
+    -- Mark that processing is starting and record the time.
+    UPDATE cdp_id_resolution_status
+    SET is_processing = TRUE,
+        processing_started_at = _current_trigger_time
+    WHERE id = TRUE;
+    -- The FOR UPDATE lock is still held by this transaction.
+
+    RAISE NOTICE '[TID:%] Lock acquired. is_processing set to TRUE. Will wait % seconds. Trigger time: %, Effective processing start: %',
+                 pg_backend_pid(), _delay_seconds, _current_trigger_time, _current_trigger_time;
+
+    -- Wait for the specified delay.
+    -- This pg_sleep happens *within* the transaction that fired the trigger.
+    -- This means the original INSERT/UPDATE statement that caused this trigger to fire
+    -- will not complete until this entire trigger function (including the sleep and SP call) completes.
+    PERFORM pg_sleep(_delay_seconds);
+
+    DECLARE
+        _sp_actual_start_time TIMESTAMPTZ := NOW();
+    BEGIN
+        RAISE NOTICE '[TID:%] Performing resolve_customer_identities_dynamic. Actual SP call at: % (after %s delay)',
+                     pg_backend_pid(), _sp_actual_start_time, _delay_seconds;
+
+        -- Call the identity resolution stored procedure
+        PERFORM resolve_customer_identities_dynamic();
+
+        -- Success: Update last execution timestamp and release the processing lock.
+        UPDATE cdp_id_resolution_status
+        SET last_successful_execution_completed_at = NOW(),
+            is_processing = FALSE,
+            processing_started_at = NULL -- Clear as processing is done
+        WHERE id = TRUE;
+        RAISE NOTICE '[TID:%] SP resolve_customer_identities_dynamic completed. is_processing set to FALSE.', pg_backend_pid();
+
+    EXCEPTION
+        WHEN OTHERS THEN
+            -- Error during SP execution: Release the processing lock but do not update last_successful_execution_completed_at.
+            UPDATE cdp_id_resolution_status
+            SET is_processing = FALSE,
+                processing_started_at = NULL -- Clear as processing attempt failed/ended
+            WHERE id = TRUE;
+            RAISE WARNING '[TID:%] Error during or after SP call for resolve_customer_identities_dynamic: %. is_processing set to FALSE.', pg_backend_pid(), SQLERRM;
+            -- Let the original DML succeed, but the SP logic encountered an issue.
+            RETURN NULL;
+    END;
+
+    -- The FOR UPDATE lock on cdp_id_resolution_status row is released when this transaction commits.
     RETURN NULL; -- Required for AFTER trigger, FOR EACH STATEMENT
 END;
 $$ LANGUAGE plpgsql;
