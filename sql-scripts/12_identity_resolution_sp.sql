@@ -210,7 +210,7 @@ BEGIN
 
         -- 6. Mark raw profile as processed
         UPDATE cdp_raw_profiles_stage
-        SET processed_at = NOW()
+        SET processed_at = NOW(), processing_status = 'processed'
         WHERE raw_profile_id = r_profile.raw_profile_id;
 
     END LOOP;

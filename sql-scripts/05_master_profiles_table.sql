@@ -15,7 +15,7 @@ CREATE TABLE cdp_master_profiles (
     
     -- Enriched identity and demographic info
     date_of_birth DATE, 
-    gender VARCHAR(20), -- male, female, unknoww,...
+    gender VARCHAR(20), -- male, female, unknown,...
     national_id VARCHAR(50), -- Vietnam (CCCD/CMND): Often 9 or 12 digits. United States: (Social Security Number - SSN): 9 digits,
     social_ids JSONB DEFAULT '{}'::jsonb, -- e.g., { "facebook": "xxx", "zalo": "yyy" }
 
@@ -35,7 +35,8 @@ CREATE TABLE cdp_master_profiles (
     preferred_communication JSONB DEFAULT '{}'::jsonb, -- e.g., { "email": true, "sms": false, "zalo": true }
 
     -- Behavioral summary
-    last_seen_at TIMESTAMPTZ,
+    last_seen_at TIMESTAMPTZ, -- last recorded event time
+    last_seen_touchpoint_id VARCHAR(36), -- touchpoint ID 
     last_known_channel VARCHAR(50), -- e.g., 'web', 'mobile', 'app', 'retail_store',...
     total_sessions INT, -- total web session and login session
     total_purchases INT, -- total count of purchased product or service 

@@ -31,3 +31,13 @@ FROM (
 
 -- Số lượng Hồ sơ Thô chưa được xử lý (Unprocessed Raw Profiles):
 SELECT COUNT(*) FROM cdp_raw_profiles_stage WHERE processed_at IS NULL;
+
+-- total_web_visitor
+SELECT COUNT(DISTINCT unnested_web_visitor_id) as total_web_visitor
+FROM cdp_master_profiles
+CROSS JOIN UNNEST(web_visitor_ids) AS unnested_web_visitor_id
+WHERE web_visitor_ids IS NOT NULL;
+
+-- total_raw_profile
+SELECT COUNT(raw_profile_id) as total_raw_profile
+FROM cdp_raw_profiles_stage
