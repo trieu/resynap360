@@ -22,23 +22,26 @@ CREATE TABLE cdp_behavioral_events (
     -- Primary Key: Hashed unique string.
     -- The application layer is responsible for generating this hash before insertion.
     -- The hash should be derived from a consistent concatenation of:
-    -- web_visitor_id, created_at (in a canonical string format like ISO 8601 UTC), url, and session_id.
+    -- {event_name, web_visitor_id, master_profile_id, created_at, web_url, user_agent, session_id}
     id TEXT PRIMARY KEY,
 
     -- Core event information
     event_name VARCHAR(255) NOT NULL,                   -- Descriptive behavioral event name, e.g., 'product_viewed', 'form_submitted', 'chat_message_sent'.
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),  -- Timestamp when the event occurred or was recorded. Critical for 'id' generation, set by the application.
+    source_system VARCHAR(100), -- systems contributing to this profile 
 
     -- Identifiers
+    tenant_id VARCHAR(36), -- Tenant/organization ID
     web_visitor_id VARCHAR(36) NOT NULL,           -- Identifier for the web visitor (e.g., client-side generated UUID stored as string). Part of 'id' source.
     master_profile_id UUID NULL,                   -- Foreign key to cdp_master_profiles. Links event to a known master profile if identified.
 
     session_id VARCHAR(255) NOT NULL,              -- Session identifier for the event. Part of 'id' source.
+    mediahost VARCHAR(255) NOT NULL,        
     web_url TEXT NOT NULL,                         -- URL associated with the event (e.g., page URL, API endpoint). Part of 'id' source.
 
     -- New fields for specific interaction types
     text_message TEXT,                                  -- For user chat messages, feedback text, or other textual input. Nullable.
-    feedback_rating SMALLINT,                               -- For user-provided ratings (e.g., 1-5 stars). Nullable.
+    feedback_rating SMALLINT,                           -- For user-provided ratings (e.g., 1-5 stars). Nullable.
 
     -- Fields for product item tracking
     item_id VARCHAR(255),                        -- An original identifier from a source system if applicable (e.g., "GBXM00Y003665.000").
@@ -91,6 +94,7 @@ CREATE INDEX IF NOT EXISTS idx_cdp_events_master_profile_id ON cdp_behavioral_ev
 CREATE INDEX IF NOT EXISTS idx_cdp_events_session_id ON cdp_behavioral_events (session_id);
 CREATE INDEX IF NOT EXISTS idx_cdp_events_web_url ON cdp_behavioral_events (web_url) WHERE LENGTH(web_url) > 5;  -- Consider length limits for url index if urls are very long, or use a hash index.
 CREATE INDEX IF NOT EXISTS idx_cdp_events_product_code ON cdp_behavioral_events (product_code) WHERE product_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cdp_events_item_id ON cdp_behavioral_events (item_id) WHERE item_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_cdp_events_item_category ON cdp_behavioral_events (item_category) WHERE item_category IS NOT NULL;
 
 -- Optional: GIN index for advanced querying within the JSONB metadata column.
