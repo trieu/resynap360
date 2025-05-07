@@ -17,6 +17,8 @@ from datetime import datetime, timedelta, timezone # Import timezone
 import random
 # logging is already imported and configured
 
+CDP_TRACK_URL = 'https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track'
+
 fake = Faker('vi_VN')
 # logging.basicConfig(level=logging.INFO) # Avoid re-calling basicConfig
 
@@ -48,7 +50,7 @@ def generate_vietnamese_phone_number():
 # --- Configuration for Simulated Time Range ---
 # Define your desired time range here. These should be UTC.
 # Example: Simulate events for the month of April 2025
-SIMULATION_START_DATETIME_STR = "2025-04-01T00:00:00Z"
+SIMULATION_START_DATETIME_STR = "2025-01-01T00:00:00Z"
 SIMULATION_END_DATETIME_STR = "2025-04-30T23:59:59Z"
 
 # Convert string dates to datetime objects once
@@ -94,43 +96,39 @@ class C360User(HttpUser):
         # Generate a random datetime within the specified simulation range
         simulated_datetime_utc = self.get_random_datetime_in_range(SIMULATION_START_UTC, SIMULATION_END_UTC)
 
-
         # 2. Format it to the desired string "YYYY-MM-DDTHH:MM:SSZ"
-        # For your specific example "2025-05-06T04:00:00Z", if you need *that exact time*
-        # and not the current time, you'd construct it directly:
-        # desired_time_str = "2025-05-06T04:00:00Z"
-        # However, assuming you want the *current* time in that format:
         formatted_datetime_utc = simulated_datetime_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-        # If you need the unix_timestamp to also correspond to this 'now_utc'
+        # unix_timestamp
         unix_ts = int(simulated_datetime_utc.timestamp() * 1000)
 
         # Generate fake data
         first_name = fake.first_name()
         last_name = fake.last_name()
         email = fake.email()
+        
         # generate a valid Vietnamese phone number
         phone = generate_vietnamese_phone_number()
-        dob = fake.date_of_birth(minimum_age=18, maximum_age=60).strftime("%Y-%m-%d") # VERIFY: Expected date format?
+        
+        # date_of_birth from 18 to 60
+        dob = fake.date_of_birth(minimum_age=18, maximum_age=60).strftime("%Y-%m-%d") 
 
+        # UTM sources
         utm_sources = ["facebook", "google", "tiktok", "zalo", "email", "organic"]
         utm_mediums = ["cpc", "banner", "video", "social", "email"]
         utm_campaigns = ["summer_sale", "new_arrival", "flash_deal", "womens_day"]
         utm_terms = ["jewelry+sale", "bracelet+offer", "ring+discount", "gold+promo"]
         utm_contents = ["image_ad_01", "carousel_ad_02", "video_ad_03", "newsletter_04"]
 
+        # Payload of event
+        EVENT_NAME = "identify"
         payload = {
             "schema_version": "2025.04.28", # CRITICAL: VERIFY THIS VALUE with API documentation
             "event_id": str(uuid.uuid4()),
             "tenant_id": "PNJ",
-            # isoformat() on a timezone-aware UTC datetime will produce a string like 'YYYY-MM-DDTHH:MM:SS.ffffff+00:00'
-            # or 'YYYY-MM-DDTHH:MM:SS.ffffffZ' if using strftime more explicitly.
-            # Check what the API expects (e.g., precision of milliseconds, Z vs +00:00)
             "datetime": formatted_datetime_utc,
-            # If you need exactly 'Z' and 3 decimal places for milliseconds:
-            # "datetime": now.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + "Z",
-            "unix_timestamp": unix_ts, # VERIFY: Milliseconds or seconds?
-            "metric": "identify", # VERIFY: Allowed values?
+            "unix_timestamp": unix_ts, 
+            "metric": EVENT_NAME, # VERIFY: Allowed values?
             "visid": str(uuid.uuid4()),
             "mediahost": "www.pnj.com.vn",
             "tpurl": "https://www.pnj.com.vn/",
@@ -138,9 +136,9 @@ class C360User(HttpUser):
                 "phone": phone,
                 "lastname": last_name,
                 "firstname": first_name,
-                "gender": fake.random_element(elements=("male", "female")), # VERIFY: Case-sensitive allowed values? (e.g., "MALE", "FEMALE")
+                "gender": fake.random_element(elements=("male", "female")),
                 "dob": dob,
-                "loyalty_level": fake.random_element(elements=("bronze", "silver", "gold", "platinum")), # VERIFY: Case-sensitive allowed values?
+                "loyalty_level": fake.random_element(elements=("bronze", "silver", "gold", "platinum")),
                 "email": email,
                 "metadata": {
                     # VERIFY: Expected format/values for referrer? (e.g., full URL, specific keywords)
@@ -148,25 +146,27 @@ class C360User(HttpUser):
                 }
             },
             "utmdata": {
-                "utmsource": random.choice(utm_sources), # VERIFY: Any restrictions?
-                "utmmedium": random.choice(utm_mediums), # VERIFY: Any restrictions?
-                "utmcampaign": random.choice(utm_campaigns), # VERIFY: Any restrictions?
-                "utmterm": random.choice(utm_terms), # VERIFY: Any restrictions?
-                "utmcontent": random.choice(utm_contents) # VERIFY: Any restrictions?
+                "utmsource": random.choice(utm_sources), 
+                "utmmedium": random.choice(utm_mediums),
+                "utmcampaign": random.choice(utm_campaigns), 
+                "utmterm": random.choice(utm_terms), 
+                "utmcontent": random.choice(utm_contents) 
             }
         }
+        
         # This log is very helpful.
         logging.debug("🔄 Payload to be sent:\n" + json.dumps(payload, indent=2, ensure_ascii=False))
 
+        # Set headers
         headers = {
-            "Content-Type": "application/json", # self.client.post with json=payload sets this, but explicit is fine.
+            "Content-Type": "application/json",
             "Accept": "application/json",
             "user-agent": self.client.headers.get("User-Agent", "LocustIO") # Use Locust's default or your custom one
         }
 
         # If host is set on the class, url should be relative: '/dev/c360-profile-track'
         with self.client.post(
-            url='https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track',
+            url=CDP_TRACK_URL,
             json=payload, # Locust handles the json.dumps internally
             headers=headers,
             catch_response=True
