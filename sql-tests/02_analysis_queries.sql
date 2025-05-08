@@ -8,7 +8,7 @@ SELECT COUNT(*) FROM cdp_master_profiles;
 SELECT COUNT(DISTINCT master_profile_id) FROM cdp_profile_links;
 
 -- Số lượng Hồ sơ Thô đã được giải quyết (Processed Raw Profiles):
-SELECT COUNT(*) FROM cdp_raw_profiles_stage WHERE processed_at IS NOT NULL;
+SELECT COUNT(*) FROM cdp_raw_profiles_stage;
 
 -- Số lượng Hồ sơ Thô được liên kết với một Master (Linked Raw Profiles):
 SELECT COUNT(*) FROM cdp_profile_links;
