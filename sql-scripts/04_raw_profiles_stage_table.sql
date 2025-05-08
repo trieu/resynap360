@@ -4,9 +4,9 @@ CREATE TABLE cdp_raw_profiles_stage (
     raw_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho mỗi bản ghi thô
     -- Các cột dữ liệu thô tương ứng với các attribute được định nghĩa trong cdp_profile_attributes
     -- Tên cột ở đây nên khớp với attribute_internal_code nếu storage_type là 'COLUMN'
-    first_name VARCHAR(255),
-    last_name VARCHAR(255),
-    gender VARCHAR(20), -- male, female, unknown,...
+    first_name VARCHAR(255) DEFAULT '',
+    last_name VARCHAR(255) DEFAULT '',
+    gender VARCHAR(20) DEFAULT 'unknown' , -- male, female, unknown,...
     date_of_birth DATE, 
 
     email citext, -- Sử dụng citext cho email
@@ -23,21 +23,21 @@ CREATE TABLE cdp_raw_profiles_stage (
     zip_code VARCHAR(10),
 
     -- Behavioral summary
-    last_seen_at TIMESTAMPTZ,
+    last_seen_at TIMESTAMPTZ DEFAULT NOW(), -- last recorded event time
     last_seen_touchpoint_id VARCHAR(36), -- touchpoint ID 
     last_known_channel VARCHAR(50), -- e.g., 'web', 'mobile', 'app', 'retail_store',...
-    total_sessions INT, -- total web session and login session, compute from event
+    total_sessions INT DEFAULT 1, -- total web session and login session, compute from event
 
     -- Preferences and localization
-    preferred_language VARCHAR(20), -- e.g., 'vi', 'en'
-    preferred_currency VARCHAR(10), -- e.g., 'VND', 'USD'
+    preferred_language VARCHAR(20) DEFAULT '', -- e.g., 'vi', 'en'
+    preferred_currency VARCHAR(10) DEFAULT '', -- e.g., 'VND', 'USD'
     preferred_communication JSONB DEFAULT '{}'::jsonb, -- e.g., { "email": true, "sms": false, "zalo": true }
 
     -- Thêm các trường dữ liệu khác từ nguồn
-    source_system VARCHAR(100), -- Hệ thống nguồn của bản ghi
+    source_system VARCHAR(100) DEFAULT '', -- Hệ thống nguồn của bản ghi
     received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     processed_at TIMESTAMP WITH TIME ZONE, -- Đánh dấu thời gian xử lý
-    processing_status VARCHAR(50), -- track the state of the raw record in the identity resolution pipeline (e.g., 'new', 'in_progress', 'processed', 'error', 'ignored').
+    processing_status VARCHAR(50) DEFAULT 'new', -- track the state of the raw record in the identity resolution pipeline (e.g., 'new', 'in_progress', 'processed', 'error', 'ignored').
     ext_attributes JSON -- Trường dữ liệu mở rộng dưới dạng JSON
 );
 

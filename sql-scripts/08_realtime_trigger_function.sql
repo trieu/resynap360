@@ -1,9 +1,12 @@
-CREATE OR REPLACE FUNCTION process_new_raw_profiles_trigger_func()
-RETURNS TRIGGER AS $$
+
+-- Main Logic Function (can be run manually)
+CREATE OR REPLACE FUNCTION process_new_raw_profiles()
+RETURNS void AS $$
 DECLARE
     _status RECORD;
     _current_trigger_time TIMESTAMPTZ := NOW();
     _delay_seconds INTEGER := 5;
+    _sp_actual_start_time TIMESTAMPTZ;
 BEGIN
     -- Attempt to get an exclusive lock on the status row.
     -- If another transaction has it (meaning another trigger fired and is active),
@@ -17,7 +20,7 @@ BEGIN
                          pg_backend_pid(), _current_trigger_time;
             -- Depending on desired behavior, you might want to retry or simply exit.
             -- For now, exiting as the other transaction should handle it.
-            RETURN NULL;
+            RETURN;
     END;
 
     -- Check if another instance is already marked as processing.
@@ -27,7 +30,7 @@ BEGIN
     IF _status.is_processing THEN
         RAISE NOTICE '[TID:%] SP execution is already in progress or scheduled by another trigger. is_processing=TRUE. Current trigger time: %, Lock holder started at: %',
                      pg_backend_pid(), _current_trigger_time, _status.processing_started_at;
-        RETURN NULL; -- Do nothing; let the other process complete. The FOR UPDATE lock is released at TX end.
+        RETURN; -- Do nothing; let the other process complete. The FOR UPDATE lock is released at TX end.
     END IF;
 
     -- This trigger instance will handle the execution.
@@ -44,11 +47,11 @@ BEGIN
     -- Wait for the specified delay.
     -- This pg_sleep happens *within* the transaction that fired the trigger.
     -- This means the original INSERT/UPDATE statement that caused this trigger to fire
-    -- will not complete until this entire trigger function (including the sleep and SP call) completes.
+    -- will not complete until this entire function (including the sleep and SP call) completes.
     PERFORM pg_sleep(_delay_seconds);
 
-    DECLARE
-        _sp_actual_start_time TIMESTAMPTZ := NOW();
+    -- Record the actual time the SP is called
+    _sp_actual_start_time := NOW();
     BEGIN
         RAISE NOTICE '[TID:%] Performing resolve_customer_identities_dynamic. Actual SP call at: % (after %s delay)',
                      pg_backend_pid(), _sp_actual_start_time, _delay_seconds;
@@ -72,11 +75,20 @@ BEGIN
                 processing_started_at = NULL -- Clear as processing attempt failed/ended
             WHERE id = TRUE;
             RAISE WARNING '[TID:%] Error during or after SP call for resolve_customer_identities_dynamic: %. is_processing set to FALSE.', pg_backend_pid(), SQLERRM;
-            -- Let the original DML succeed, but the SP logic encountered an issue.
-            RETURN NULL;
+            -- Let the caller (manual or trigger) continue, but the SP logic encountered an issue.
+            RETURN;
     END;
-
     -- The FOR UPDATE lock on cdp_id_resolution_status row is released when this transaction commits.
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- Trigger Function (delegates to the above):
+CREATE OR REPLACE FUNCTION process_new_raw_profiles_trigger_func()
+RETURNS trigger AS $$
+BEGIN
+    -- Delegate the logic to the main processing function
+    PERFORM process_new_raw_profiles();
     RETURN NULL; -- Required for AFTER trigger, FOR EACH STATEMENT
 END;
 $$ LANGUAGE plpgsql;

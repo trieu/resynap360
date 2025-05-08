@@ -15,6 +15,7 @@ import uuid
 import json
 from datetime import datetime, timedelta, timezone # Import timezone
 import random
+import unidecode
 # logging is already imported and configured
 
 CDP_TRACK_URL = 'https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track'
@@ -76,6 +77,71 @@ except ValueError as e:
     SIMULATION_END_UTC = datetime.now(timezone.utc)
     logging.warning(f"Falling back to default range: {SIMULATION_START_UTC.isoformat()} to {SIMULATION_END_UTC.isoformat()}")
 
+
+# Common Vietnamese family names (unisex)
+vietnamese_last_names = [
+    "Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Võ", "Đặng",
+    "Bùi", "Đỗ", "Hồ", "Ngô", "Dương", "Lý"
+]
+
+# Popular Vietnamese male given names
+vietnamese_male_first_names = [
+    "Anh", "Bình", "Cường", "Dũng", "Đạt", "Đức", "Hải", "Hiếu", "Hùng", "Khánh",
+    "Khoa", "Minh", "Nam", "Nguyên", "Phát", "Quang", "Quốc", "Sơn", "Thắng", "Trí",
+    "Tuấn", "Việt", "Vinh", "Vũ"
+]
+
+# Popular Vietnamese female given names
+vietnamese_female_first_names = [
+    "An", "Anh", "Chi", "Diễm", "Dung", "Giang", "Hạnh", "Hiền", "Hoa", "Hồng",
+    "Lan", "Linh", "Mai", "My", "Ngọc", "Như", "Phương", "Quỳnh", "Thảo", "Thanh",
+    "Thùy", "Trang", "Trúc", "Tuyết", "Yến"
+]
+
+address_lines = [
+    "123 Lê Lợi, Phường Bến Thành, Quận 1",
+    "45 Nguyễn Huệ, Phường Bến Nghé, Quận 1",
+    "90 Trần Hưng Đạo, Phường Cầu Kho, Quận 1",
+    "12A Nguyễn Thị Minh Khai, Phường Đa Kao, Quận 1",
+    "215 Hai Bà Trưng, Phường 6, Quận 3",
+    "101 Võ Thị Sáu, Phường Tân Định, Quận 1",
+    "78 Cách Mạng Tháng 8, Phường Bến Thành, Quận 1",
+    "60 Phan Xích Long, Phường 2, Quận Phú Nhuận",
+    "29 Nguyễn Văn Cừ, Phường 1, Quận 5",
+    "134 Đinh Tiên Hoàng, Phường Đa Kao, Quận 1",
+    "56 Phạm Ngọc Thạch, Phường 6, Quận 3",
+    "88 Nguyễn Trãi, Phường Nguyễn Cư Trinh, Quận 1",
+    "102 Lý Chính Thắng, Phường 7, Quận 3",
+    "39 Nguyễn Thái Học, Phường Cầu Ông Lãnh, Quận 1",
+    "72 Trường Sơn, Phường 2, Quận Tân Bình",
+    "45B Bùi Thị Xuân, Phường Phạm Ngũ Lão, Quận 1",
+    "111 Nguyễn Oanh, Phường 10, Quận Gò Vấp",
+    "9 Trường Chinh, Phường Tây Thạnh, Quận Tân Phú",
+    "123 Nguyễn Văn Linh, Phường Tân Phong, Quận 7",
+    "18A Phan Đăng Lưu, Phường 6, Quận Bình Thạnh"
+]
+
+ # event sources
+source_systems = ["ecommerce","website","CRM","mobileapp","chatbot"]
+
+# Gender-based Vietnamese name generation
+def generate_vietnamese_name(gender: str = None):
+    last_name = random.choice(vietnamese_last_names)
+    
+    if gender == "male":
+        first_name = random.choice(vietnamese_male_first_names)
+    elif gender == "female":
+        first_name = random.choice(vietnamese_female_first_names)
+    else:
+        first_name = random.choice(vietnamese_male_first_names + vietnamese_female_first_names)
+    
+    return first_name, last_name
+
+def generate_email(first_name, last_name):
+    email_number = random.randint(10, 99)        
+    email = f"{unidecode.unidecode(first_name.lower())}.{unidecode.unidecode(last_name.lower())}{email_number}@example.com"
+    return email
+
 class C360User(HttpUser):
     wait_time = between(1, 3)
     # It's good practice to set the host at the class level if all tasks hit the same host
@@ -103,54 +169,66 @@ class C360User(HttpUser):
         unix_ts = int(simulated_datetime_utc.timestamp() * 1000)
 
         # Generate fake data
-        first_name = fake.first_name()
-        last_name = fake.last_name()
-        email = fake.email()
+        
+        # date_of_birth from 18 to 60
+        dob = fake.date_of_birth(minimum_age=18, maximum_age=60).strftime("%Y-%m-%d") 
+        
+        # Gender assignment
+        gender = random.choice(["male", "female", "unknown", "other"])
+
+        # Generate names based on gender
+        first_name, last_name = generate_vietnamese_name(gender)
+    
+        # email 
+        # Email: e.g. ngoc.tran42@example.com
+        email = generate_email(first_name, last_name)
         
         # generate a valid Vietnamese phone_number number
         phone_number = generate_vietnamese_phone_number()
         
-        # date_of_birth from 18 to 60
-        dob = fake.date_of_birth(minimum_age=18, maximum_age=60).strftime("%Y-%m-%d") 
-
         # UTM sources
-        utm_sources = ["facebook", "google", "tiktok", "zalo", "email", "organic"]
-        utm_mediums = ["cpc", "banner", "video", "social", "email"]
+        utm_sources = ["facebook", "google", "tiktok", "zalo"]
+        selected_utmsource = random.choice(utm_sources)
+        
+        utm_mediums = ["post", "banner", "video", "social"]
         utm_campaigns = ["summer_sale", "new_arrival", "flash_deal", "womens_day"]
         utm_terms = ["jewelry+sale", "bracelet+offer", "ring+discount", "gold+promo"]
         utm_contents = ["image_ad_01", "carousel_ad_02", "video_ad_03", "newsletter_04"]
+        
 
         # Payload of event
         EVENT_NAME = "identify"
+        
         payload = {
-            "schema_version": "2025.04.28", # CRITICAL: VERIFY THIS VALUE with API documentation
+            "schema_version": "2025.04.28", 
             "event_id": str(uuid.uuid4()),
             "tenant_id": "PNJ",
             "datetime": formatted_datetime_utc,
             "unix_timestamp": unix_ts, 
-            "metric": EVENT_NAME, # VERIFY: Allowed values?
+            "metric": EVENT_NAME,
             "visid": str(uuid.uuid4()),
             "mediahost": "www.pnj.com.vn",
             "tpurl": "https://www.pnj.com.vn/",
             "profile_traits": {
                 "phone_number": phone_number,
-                "last_name": last_name,
                 "first_name": first_name,
-                "gender": fake.random_element(elements=("male", "female")),
-                "dob": dob,
-                "loyalty_level": fake.random_element(elements=("bronze", "silver", "gold", "platinum")),
+                "last_name": last_name,
+                "gender": gender,
+                "date_of_birth": dob,                
                 "email": email,
-                "metadata": {
-                    # VERIFY: Expected format/values for referrer? (e.g., full URL, specific keywords)
-                    "referrer": random.choice(utm_sources) + "_ad"
+                "source_system": random.choice(source_systems),
+                "address_line1": random.choice(address_lines),
+                "city": "Hochiminh City",
+                "ext_attributes": {
+                    "referrer": selected_utmsource,
+                    "utmdata": {
+                        "utmsource": selected_utmsource, 
+                        "utmmedium": random.choice(utm_mediums),
+                        "utmcampaign": random.choice(utm_campaigns), 
+                        "utmterm": random.choice(utm_terms), 
+                        "utmcontent": random.choice(utm_contents) 
+                    }
                 }
-            },
-            "utmdata": {
-                "utmsource": random.choice(utm_sources), 
-                "utmmedium": random.choice(utm_mediums),
-                "utmcampaign": random.choice(utm_campaigns), 
-                "utmterm": random.choice(utm_terms), 
-                "utmcontent": random.choice(utm_contents) 
             }
         }
         
