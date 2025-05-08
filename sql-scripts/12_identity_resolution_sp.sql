@@ -64,9 +64,11 @@ BEGIN
     -- 2. Iterate through unprocessed raw profiles
     RAISE NOTICE 'Processing up to % unprocessed raw profiles', batch_size;
     FOR r_profile IN
-        SELECT *
-        FROM cdp_raw_profiles_stage
-        WHERE processing_status = 'new'
+        SELECT raw_profiles.*
+        FROM public.cdp_raw_profiles_stage as raw_profiles
+        LEFT JOIN public.cdp_profile_links as links
+        ON raw_profiles.raw_profile_id = links.raw_profile_id
+        WHERE links.raw_profile_id IS NULL
         LIMIT batch_size
     LOOP
         RAISE NOTICE 'Processing raw_profile_id: %', r_profile.raw_profile_id;
@@ -194,7 +196,10 @@ BEGIN
                     FROM unnest(mp.web_visitor_ids || r_profile.web_visitor_id) AS elem
                 ),
                 tenant_id = COALESCE(mp.tenant_id, r_profile.tenant_id),
-                updated_at = NOW()
+                updated_at = NOW(),
+                last_seen_at = r_profile.last_seen_at,
+                last_seen_touchpoint_id =  COALESCE(mp.last_seen_touchpoint_id, r_profile.last_seen_touchpoint_id),
+                last_known_channel = COALESCE(mp.last_known_channel, r_profile.last_known_channel)
             WHERE mp.master_profile_id = matched_master_id;
             RAISE NOTICE 'Updated master_profile_id % with raw_profile_id % data', matched_master_id, r_profile.raw_profile_id;
 
@@ -204,7 +209,8 @@ BEGIN
             INSERT INTO cdp_master_profiles (
                 first_name, last_name, email, phone_number,
                 address_line1, city, state, zip_code,
-                source_systems, first_seen_raw_profile_id, web_visitor_ids, tenant_id
+                source_systems, first_seen_raw_profile_id, web_visitor_ids, tenant_id, 
+                last_seen_at, last_seen_touchpoint_id, last_known_channel
             )
             VALUES (
                 r_profile.first_name,
@@ -218,7 +224,10 @@ BEGIN
                 ARRAY[r_profile.source_system],
                 r_profile.raw_profile_id,
                 ARRAY[r_profile.web_visitor_id],
-                r_profile.tenant_id
+                r_profile.tenant_id,
+                r_profile.last_seen_at,
+                r_profile.last_seen_touchpoint_id,
+                r_profile.last_known_channel
             )
             RETURNING master_profile_id INTO matched_master_id;
             RAISE NOTICE 'Created new master_profile_id % for raw_profile_id %', matched_master_id, r_profile.raw_profile_id;
@@ -236,10 +245,7 @@ BEGIN
             END;
         END IF;
 
-        -- 6. Mark raw profile as processed
-        UPDATE cdp_raw_profiles_stage
-        SET processing_status = 'processed', processed_at = NOW()
-        WHERE raw_profile_id = r_profile.raw_profile_id;
+
         RAISE NOTICE 'Marked raw_profile_id % as processed', r_profile.raw_profile_id;
     END LOOP;
 

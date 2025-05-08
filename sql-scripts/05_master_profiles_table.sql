@@ -3,9 +3,6 @@ CREATE TABLE cdp_master_profiles (
     master_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho hồ sơ master
     tenant_id VARCHAR(36), -- Tenant/organization ID
 
-    first_name VARCHAR(255),
-    last_name VARCHAR(255),
-
     -- Core identity fields
     email CITEXT,               -- primary email
     secondary_emails TEXT[],    -- Capture multiple verified emails
@@ -14,6 +11,8 @@ CREATE TABLE cdp_master_profiles (
     web_visitor_ids TEXT[], -- Web visitor IDs associated with this profile
     
     -- Enriched identity and demographic info
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
     date_of_birth DATE, 
     gender VARCHAR(20), -- male, female, unknown,...
     national_id VARCHAR(50), -- Vietnam (CCCD/CMND): Often 9 or 12 digits. United States: (Social Security Number - SSN): 9 digits,

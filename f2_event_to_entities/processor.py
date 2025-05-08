@@ -139,8 +139,7 @@ def save_to_postgresql(profile, connection):
                     preferred_communication = EXCLUDED.preferred_communication,
                     source_system = EXCLUDED.source_system,
                     ext_attributes = EXCLUDED.ext_attributes,
-                    received_at = NOW(),
-                    processed_at = NULL;
+                    received_at = NOW();
             """
 
             values = (
