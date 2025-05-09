@@ -74,6 +74,7 @@ CREATE TABLE cdp_master_profiles (
     persona_embedding VECTOR(384)   -- For semantic similarity (e.g., interest, behavior, content match)
 );
 
+-- FUNCTION để tự động cập nhật trường updated_at trong cdp_master_profiles
 CREATE OR REPLACE FUNCTION set_master_profile_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

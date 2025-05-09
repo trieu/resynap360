@@ -10,9 +10,9 @@ INSERT INTO cdp_profile_attributes (
 ) VALUES
 (1, 'email', 'email', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
 (2, 'phone_number','phone_number', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
-(3,'zalo_user_id', 'zalo_user_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
+(3,'social_user_id', 'social_user_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
 (4,'web_visitor_id', 'web_visitor_id', 'TEXT', TRUE, 'exact',NULL, 'most_recent', 'ACTIVE', TRUE),
-(5,'crm_id', 'crm_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
+(5,'crm_source_id', 'crm_source_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
 ;
 
 
@@ -34,6 +34,6 @@ INSERT INTO cdp_raw_profiles_stage (
 
 INSERT INTO cdp_raw_profiles_stage (
     raw_profile_id, first_name, last_name, email, phone_number,
-    address_line1, city, state, zalo_user_id, source_system, processed_at
+    address_line1, city, state, social_user_id, source_system, processed_at
 ) VALUES
 (gen_random_uuid(), 'Trieu', 'Nguyen', '', '09031229', 'Q6', '', 'Vietnam', '456', 'Zalo', NULL);

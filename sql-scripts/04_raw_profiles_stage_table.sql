@@ -51,7 +51,6 @@ CREATE TABLE cdp_raw_profiles_stage (
 
 
 
-
 -- Tạo Index cho các trường quan trọng dùng cho ghép nối
 -- Cần tạo index cho TẤT CẢ các thuộc tính có is_identity_resolution = TRUE và is_index = TRUE
 -- Loại index (B-tree, GIN) phụ thuộc vào data_type và matching_rule
