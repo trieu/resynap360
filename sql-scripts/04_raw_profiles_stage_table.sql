@@ -1,7 +1,7 @@
 -- Bảng 1: cdp_raw_profiles_stage
 -- Firehose / Event Queue sẽ đẩy dữ liệu vào bảng này. Lược đồ cần matching với JSON dữ liệu đầu vào
 CREATE TABLE cdp_raw_profiles_stage (
-    raw_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho mỗi bản ghi thô
+    raw_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho raw profile
    
     -- metadata of profile source
     tenant_id VARCHAR(36), -- ID của Tenant (khách hàng sử dụng CDP)
