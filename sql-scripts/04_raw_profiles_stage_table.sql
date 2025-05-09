@@ -1,5 +1,5 @@
 -- Bảng 1: cdp_raw_profiles_stage
--- Firehose / Event Queue sẽ đẩy dữ liệu vào bảng này. Lược đồ cần matching với JSON dữ liệu đầu vào
+-- Firehose / Event Queue sẽ đẩy dữ liệu vào bảng này. Lược đồ cần matching với JSONB dữ liệu đầu vào
 CREATE TABLE cdp_raw_profiles_stage (
     raw_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho raw profile
    
@@ -45,8 +45,8 @@ CREATE TABLE cdp_raw_profiles_stage (
     last_seen_touchpoint_url VARCHAR(2048), -- URL của điểm chạm (touchpoint) cuối cùng
     last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng, ví dụ: 'web', 'mobile', 'app', 'retail_store',... 
 
-    -- Trường dữ liệu mở rộng dưới dạng JSON
-    ext_attributes JSON 
+    -- Trường dữ liệu mở rộng dưới dạng JSONB
+    ext_attributes JSONB 
 );
 
 

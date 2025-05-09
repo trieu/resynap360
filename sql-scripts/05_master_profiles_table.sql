@@ -1,3 +1,7 @@
+
+-- Cài đặt các Extension cần thiết cho Personalization / Fuzzy identity Resolution
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Bảng 2: cdp_master_profiles: Master profile table: golden record per resolved identity
 CREATE TABLE cdp_master_profiles (
     master_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho hồ sơ master
@@ -468,7 +472,7 @@ BEGIN
         USING HNSW (identity_embedding vector_l2_ops);
     END IF;
 END$$;
-*/
+
 
 -- cho persona_embedding (Bỏ comment và điều chỉnh nếu bạn dùng pgvector)
 DO $$
