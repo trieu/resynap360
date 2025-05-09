@@ -1,5 +1,7 @@
 # Tài liệu thiết kế bảng `cdp_master_profiles` 
 
+**Ngày tạo:** 09 tháng 05 năm 2025
+
 1. Mục đích sử dụng
 2. Thiết kế bảng và giải thích từng trường
 3. Index chi tiết

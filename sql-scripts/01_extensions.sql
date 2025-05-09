@@ -5,4 +5,5 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm; -- Cho similarity based on trigrams
 
 -- Cài đặt các Extension cần thiết cho Fuzzy Matching
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 

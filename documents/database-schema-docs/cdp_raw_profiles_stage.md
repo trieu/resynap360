@@ -1,5 +1,7 @@
 # Tài liệu thiết kế bảng `cdp_raw_profiles_stage` 
 
+**Ngày tạo:** 09 tháng 05 năm 2025
+
 1. Mục đích sử dụng
 2. Thiết kế bảng và giải thích từng trường
 3. Index chi tiết
