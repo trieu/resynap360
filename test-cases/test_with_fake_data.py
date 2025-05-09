@@ -18,6 +18,16 @@ import random
 import unidecode
 # logging is already imported and configured
 
+import redis
+
+# Connect to Redis at 127.0.0.1:6380
+redis_client = redis.StrictRedis(host='127.0.0.1', port=6380, db=0, decode_responses=True)
+
+def reset_redis_counters():
+    redis_client.delete("unique:phone_numbers", "unique:visids", "unique:emails")
+
+reset_redis_counters()
+
 CDP_TRACK_URL = 'https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track'
 
 fake = Faker('vi_VN')
@@ -178,6 +188,8 @@ class C360User(HttpUser):
 
         # Generate names based on gender
         first_name, last_name = generate_vietnamese_name(gender)
+        
+        visitor_id = str(uuid.uuid4())
     
         # email 
         # Email: e.g. ngoc.tran42@example.com
@@ -195,6 +207,17 @@ class C360User(HttpUser):
         utm_terms = ["jewelry+sale", "bracelet+offer", "ring+discount", "gold+promo"]
         utm_contents = ["image_ad_01", "carousel_ad_02", "video_ad_03", "newsletter_04"]
         
+        # Track unique phone_number and visid using Redis Sets
+        redis_client.sadd("unique:phone_numbers", phone_number)
+        redis_client.sadd("unique:visids", visitor_id)
+        redis_client.sadd("unique:emails", email)
+
+        # Optional: log unique counts
+        phone_count = redis_client.scard("unique:phone_numbers")
+        visid_count = redis_client.scard("unique:visids")
+        email_count = redis_client.scard("unique:emails")
+        logging.info(f"\n ✅  Unique phone: {phone_count}, Unique visids: {visid_count} , Unique email: {email_count} \n")
+
 
         # Payload of event
         EVENT_NAME = "identify"
@@ -206,7 +229,7 @@ class C360User(HttpUser):
             "datetime": formatted_datetime_utc,
             "unix_timestamp": unix_ts, 
             "metric": EVENT_NAME,
-            "visid": str(uuid.uuid4()),
+            "visid": visitor_id,
             "mediahost": "www.pnj.com.vn",
             "tpurl": "https://www.pnj.com.vn/",
             "profile_traits": {
