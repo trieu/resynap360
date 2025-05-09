@@ -1,44 +1,55 @@
 -- Bảng 1: cdp_raw_profiles_stage
--- Firehose / Event Queue sẽ đẩy dữ liệu vào bảng này. Lược đồ cần khớp với dữ liệu đầu vào.
+-- Firehose / Event Queue sẽ đẩy dữ liệu vào bảng này. Lược đồ cần matching với JSON dữ liệu đầu vào
 CREATE TABLE cdp_raw_profiles_stage (
     raw_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho mỗi bản ghi thô
-    -- Các cột dữ liệu thô tương ứng với các attribute được định nghĩa trong cdp_profile_attributes
-    -- Tên cột ở đây nên khớp với attribute_internal_code nếu storage_type là 'COLUMN'
-    first_name VARCHAR(255),
-    last_name VARCHAR(255),
-    gender VARCHAR(20), -- male, female, unknown,...
+   
+    -- metadata of profile source
+    tenant_id VARCHAR(36), -- ID của Tenant (khách hàng sử dụng CDP)
+    source_system VARCHAR(100), -- Hệ thống nguồn của bản ghi
+    received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    status_code SMALLINT DEFAULT 1, -- valid value: 1: is active, 0: deactivated (bị vô hiệu hóa), -1: need to delete
+
+    -- core ID fields for identity resolution 
+    email citext, -- Sử dụng kiểu citext cho email để tìm kiếm không phân biệt chữ hoa/thường
+    phone_number VARCHAR(50), -- Cần chuẩn hóa số điện thoại trước hoặc trong quá trình xử lý   
+    web_visitor_id VARCHAR(36), -- Web Visitor ID (từ cookie hoặc tracking script)
+    crm_contact_id VARCHAR(100), -- ID contact CRM chính hoặc đã được hợp nhất (nếu có)
+    crm_source_id VARCHAR(100), -- ID của bản ghi hồ sơ gốc từ hệ thống CRM nguồn cụ thể
+    social_user_id VARCHAR(50), -- Zalo User ID, Facebook User ID, Google User ID,...
+
+    -- personal information
+    first_name VARCHAR(255), -- field mặc định name của profile. VD: 'Nguyen Van An hay 'Van An' đều OK
+    last_name VARCHAR(255), -- theo chuẩn quốc tế 
+    gender VARCHAR(20), -- ví dụ: 'male', 'female', 'unknown',...
     date_of_birth DATE, 
-
-    email citext, -- Sử dụng citext cho email
-    phone_number VARCHAR(50), -- Cần chuẩn hóa số điện thoại trước hoặc trong quá trình xử lý
-    tenant_id VARCHAR(36), -- Tenant ID 
-    zalo_user_id VARCHAR(50), -- Zalo User ID 
-    web_visitor_id VARCHAR(36), -- Web Visitor ID 
-    crm_id VARCHAR(50), -- CRM User ID 
-
-    address_line1 VARCHAR(255), -- living address
-    address_line2 VARCHAR(255), -- home address
+    
+    -- Address and location for shipping and real-time personalization (recommend products in specific location)
+    address_line1 VARCHAR(500), -- temporary residence address (tạm trú)
+    address_line2 VARCHAR(500), -- permanent address (Địa chỉ thướng trú)
     city VARCHAR(255),
     state VARCHAR(255),
     zip_code VARCHAR(10),
+    country VARCHAR(100),
+    latitude DOUBLE PRECISION, -- get from mobile app geolocation API
+    longitude DOUBLE PRECISION,-- get from mobile app geolocation API
+
+    -- Tùy chọn và bản địa hóa theo ngôn ngữ, kênh giao tiếp và hệ thống tiền tệ
+    preferred_language VARCHAR(20), -- Ngôn ngữ ưa thích, ví dụ: 'vi', 'en'
+    preferred_currency VARCHAR(10), -- Tiền tệ ưa thích, ví dụ: 'VND', 'USD'
+    preferred_communication JSONB, -- Tùy chọn liên lạc ưa thích, ví dụ: { "email": true, "sms": false, "zalo": true }
 
     -- Behavioral summary
-    last_seen_at TIMESTAMPTZ DEFAULT NOW(), -- last recorded event time
-    last_seen_touchpoint_id VARCHAR(36), -- touchpoint ID 
-    last_known_channel VARCHAR(50), -- e.g., 'web', 'mobile', 'app', 'retail_store',...
-    total_sessions INT DEFAULT 1, -- total web session and login session, compute from event
+    last_seen_at TIMESTAMPTZ DEFAULT NOW(), -- Thời gian sự kiện cuối cùng được ghi nhận
+    last_seen_observer_id VARCHAR(36), -- ID của event observer cuối cùng khi quan sát hành vi user
+    last_seen_touchpoint_id VARCHAR(36), -- ID của điểm chạm (touchpoint) cuối cùng
+    last_seen_touchpoint_url VARCHAR(2048), -- URL của điểm chạm (touchpoint) cuối cùng
+    last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng, ví dụ: 'web', 'mobile', 'app', 'retail_store',... 
 
-    -- Preferences and localization
-    preferred_language VARCHAR(20), -- e.g., 'vi', 'en'
-    preferred_currency VARCHAR(10), -- e.g., 'VND', 'USD'
-    preferred_communication JSONB, -- e.g., { "email": true, "sms": false, "zalo": true }
-
-    -- Thêm các trường dữ liệu khác từ nguồn
-    source_system VARCHAR(100), -- Hệ thống nguồn của bản ghi
-    received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-    ext_attributes JSON -- Trường dữ liệu mở rộng dưới dạng JSON
+    -- Trường dữ liệu mở rộng dưới dạng JSON
+    ext_attributes JSON 
 );
+
+
 
 
 -- Tạo Index cho các trường quan trọng dùng cho ghép nối
@@ -71,7 +82,9 @@ BEGIN
     END IF;
 END$$;
 
-
+-- gender validation
+ALTER TABLE cdp_raw_profiles_stage
+ADD CONSTRAINT chk_gender_valid CHECK (gender IN ('male', 'female', 'unknown', 'other'));
 
 -- Index on web_visitor_id for efficient filtering 
 DO $$
@@ -129,10 +142,18 @@ BEGIN
     END IF;
 END$$;
 
-
+-- Index on email for faster lookups 
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_email'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_email ON cdp_raw_profiles_stage (email);
+    END IF;
+END$$;
 
 -- Compound index on tenant_id and email for faster lookups by email within a tenant
--- You already have idx_raw_profiles_stage_email, this adds tenant context
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -143,8 +164,19 @@ BEGIN
     END IF;
 END$$;
 
+
+-- Index on phone_number for faster lookups 
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_phone_number'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_phone_number ON cdp_raw_profiles_stage (phone_number);
+    END IF;
+END$$;
+
 -- Compound index on tenant_id and phone_number for faster lookups by phone within a tenant
--- You already have idx_raw_profiles_stage_phone, this adds tenant context
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -155,56 +187,111 @@ BEGIN
     END IF;
 END$$;
 
-
--- Index on zalo_user_id if it's a frequently used identifier for matching or lookup
+-- Index on social_user_id for efficient filtering
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes
-        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_zalo_user_id'
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_social_user_id' 
     ) THEN
-        CREATE INDEX idx_raw_profiles_stage_zalo_user_id ON cdp_raw_profiles_stage (zalo_user_id);
+        CREATE INDEX idx_raw_profiles_stage_social_user_id ON cdp_raw_profiles_stage (social_user_id); 
     END IF;
 END$$;
 
--- Compound index on tenant_id and zalo_user_id
+-- Compound index on tenant_id and social_user_id
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes
-        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_id_zalo_user_id'
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_id_social_user_id' 
     ) THEN
-        CREATE INDEX idx_raw_profiles_stage_tenant_id_zalo_user_id ON cdp_raw_profiles_stage (tenant_id, zalo_user_id);
+        CREATE INDEX idx_raw_profiles_stage_tenant_id_social_user_id ON cdp_raw_profiles_stage (tenant_id, social_user_id); 
     END IF;
 END$$;
 
--- Index on crm_id if it's a frequently used identifier for matching or lookup
+
+-- Index on crm_contact_id if it's a frequently used identifier for matching or lookup
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes
-        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_crm_id'
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_crm_contact_id'
     ) THEN
-        CREATE INDEX idx_raw_profiles_stage_crm_id ON cdp_raw_profiles_stage (crm_id);
+        CREATE INDEX idx_raw_profiles_stage_crm_contact_id ON cdp_raw_profiles_stage (crm_contact_id);
     END IF;
 END$$;
 
--- Compound index on tenant_id and crm_id
+-- Compound index on tenant_id and crm_contact_id
 DO $$
 BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_indexes
-        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_id_crm_id'
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_id_crm_contact_id'
     ) THEN
-        CREATE INDEX idx_raw_profiles_stage_tenant_id_crm_id ON cdp_raw_profiles_stage (tenant_id, crm_id);
+        CREATE INDEX idx_raw_profiles_stage_tenant_id_crm_contact_id ON cdp_raw_profiles_stage (tenant_id, crm_contact_id);
     END IF;
 END$$;
 
+-- Index tổng hợp cho tra cứu crm_source_id cụ thể từ một source_system trong một tenant
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_ss_crm_source_id'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_tenant_ss_crm_source_id ON cdp_raw_profiles_stage (tenant_id, source_system, crm_source_id);
+    END IF;
+END$$;
+
+-- (Tùy chọn) Index nếu thường xuyên tra cứu crm_source_id chỉ với tenant_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_crm_source_id'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_tenant_crm_source_id ON cdp_raw_profiles_stage (tenant_id, crm_source_id);
+    END IF;
+END$$;
+
+-- Index cho việc lọc theo status_code trong một tenant
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_status'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_tenant_status ON cdp_raw_profiles_stage (tenant_id, status_code);
+    END IF;
+END$$;
+
+-- (Nâng cao hơn) Index cho việc xử lý các bản ghi theo status và thời gian nhận, tối ưu cho việc lấy "các bản ghi cần xóa cũ nhất"
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_status_received'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_tenant_status_received ON cdp_raw_profiles_stage (tenant_id, status_code, received_at);
+    END IF;
+END$$;
+
+-- Index cho last_seen_at (Quan trọng cho Phân tích Hành vi hoặc Xử lý Gần đây):
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_stage_tenant_last_seen_at'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_stage_tenant_last_seen_at ON cdp_raw_profiles_stage (tenant_id, last_seen_at DESC); -- DESC nếu thường xuyên lấy mới nhất
+    END IF;
+END$$;
 
 -- Trigger sẽ kích hoạt hàm process_new_raw_profiles_trigger_func
 -- sau mỗi lần INSERT hoặc UPDATE trên bảng cdp_raw_profiles_stage.
 -- FOR EACH STATEMENT: Trigger chỉ chạy một lần cho mỗi lệnh INSERT/UPDATE,
 -- hiệu quả hơn FOR EACH ROW khi Firehose chèn nhiều bản ghi cùng lúc.
+
 CREATE TRIGGER cdp_trigger_process_new_raw_profiles
 AFTER INSERT OR UPDATE ON cdp_raw_profiles_stage
 FOR EACH STATEMENT

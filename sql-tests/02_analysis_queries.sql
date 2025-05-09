@@ -1,3 +1,20 @@
+
+-- Summary Reports
+SELECT
+  (SELECT COUNT(*) FROM cdp_master_profiles) AS unique_master_profiles,
+  (SELECT COUNT(DISTINCT master_profile_id) FROM cdp_profile_links) AS unique_master_links,
+  (SELECT COUNT(*) FROM cdp_raw_profiles_stage) AS total_raw_profiles,
+  (SELECT COUNT(DISTINCT raw_profile_id) FROM cdp_profile_links) AS unique_raw_links;
+
+-- Hoặc, đếm các master có nhiều hơn một liên kết:
+SELECT COUNT(*) as duplicate_masters
+FROM (
+    SELECT master_profile_id
+    FROM cdp_profile_links
+    GROUP BY master_profile_id
+    HAVING COUNT(*) > 1
+) AS duplicate_masters;
+
 -- Tổng số Hồ sơ Thô (Total Raw Profiles):
 SELECT COUNT(*) FROM cdp_raw_profiles_stage;
 
@@ -20,14 +37,7 @@ FROM cdp_profile_links pl
 JOIN cdp_master_profiles mp ON pl.master_profile_id = mp.master_profile_id
 WHERE pl.raw_profile_id != mp.first_seen_raw_profile_id; -- Giả định first_seen_raw_profile_id lưu ID thô đầu tiên tạo master
 
--- Hoặc, đếm các master có nhiều hơn một liên kết:
-SELECT COUNT(*)
-FROM (
-    SELECT master_profile_id
-    FROM cdp_profile_links
-    GROUP BY master_profile_id
-    HAVING COUNT(*) > 1
-) AS duplicate_masters;
+
 
 -- Số lượng Hồ sơ Thô chưa được xử lý (Unprocessed Raw Profiles):
 SELECT COUNT(*) FROM cdp_raw_profiles_stage WHERE processed_at IS NULL;

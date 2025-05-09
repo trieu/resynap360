@@ -9,18 +9,19 @@ CREATE TABLE cdp_master_profiles (
     phone_number VARCHAR(50),       --  primary phone
     secondary_phone_numbers TEXT[], -- Capture multiple verified phones
     web_visitor_ids TEXT[], -- Web visitor IDs associated with this profile
+    national_ids TEXT[], -- Vietnam (CCCD/CMND): Often 9 or 12 digits. United States: (Social Security Number - SSN): 9 digits,
+    crm_contact_ids JSONB DEFAULT '{}'::jsonb, -- e.g., { "salesforce_crm": "123", "hubspot_mkt_crm": "456" }
+    social_user_ids JSONB DEFAULT '{}'::jsonb, -- e.g., { "facebook": "xxx", "zalo": "yyy" }
     
-    -- Enriched identity and demographic info
-    first_name VARCHAR(255),
-    last_name VARCHAR(255),
+    -- personal information
+    first_name VARCHAR(255), -- field mặc định name của profile. VD: 'Nguyen Van An hay 'Van An' đều OK
+    last_name VARCHAR(255), -- theo chuẩn quốc tế 
+    gender VARCHAR(20), -- ví dụ: 'male', 'female', 'unknown',...
     date_of_birth DATE, 
-    gender VARCHAR(20), -- male, female, unknown,...
-    national_id VARCHAR(50), -- Vietnam (CCCD/CMND): Often 9 or 12 digits. United States: (Social Security Number - SSN): 9 digits,
-    social_ids JSONB DEFAULT '{}'::jsonb, -- e.g., { "facebook": "xxx", "zalo": "yyy" }
 
     -- Address and location for real-time personalization and shipping
-    address_line1 VARCHAR(255), -- current living address
-    address_line2 VARCHAR(255), -- home address
+    address_line1 VARCHAR(500), -- temporary residence address (tạm trú)
+    address_line2 VARCHAR(500), -- permanent address (Địa chỉ thướng trú)
     city VARCHAR(255),
     state VARCHAR(255),
     zip_code VARCHAR(10),
@@ -34,13 +35,16 @@ CREATE TABLE cdp_master_profiles (
     preferred_communication JSONB DEFAULT '{}'::jsonb, -- e.g., { "email": true, "sms": false, "zalo": true }
 
     -- Behavioral summary
-    last_seen_at TIMESTAMPTZ, -- last recorded event time
-    last_seen_touchpoint_id VARCHAR(36), -- touchpoint ID 
-    last_known_channel VARCHAR(50), -- e.g., 'web', 'mobile', 'app', 'retail_store',...
-    total_sessions INT, -- total web session and login session
-    total_purchases INT, -- total count of purchased product or service 
+    last_seen_at TIMESTAMPTZ DEFAULT NOW(), -- Thời gian sự kiện cuối cùng được ghi nhận
+    last_seen_observer_id VARCHAR(36), -- ID của event observer cuối cùng khi quan sát hành vi user
+    last_seen_touchpoint_id VARCHAR(36), -- ID của điểm chạm (touchpoint) cuối cùng
+    last_seen_touchpoint_url VARCHAR(2048), -- URL của điểm chạm (touchpoint) cuối cùng
+    last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng, ví dụ: 'web', 'mobile', 'app', 'retail_store',...
+   
 
     -- scoring data fields
+    total_sessions INT DEFAULT 1, -- Tổng số phiên truy cập web và phiên đăng nhập, tính toán từ sự kiện
+    total_purchases INT, -- total count of purchased product or service  
     data_quality_score INT,
     lead_score INT, -- lead score for marketing analytics
     churn_probability NUMERIC, --  a predictive metric that estimates the likelihood of a customer discontinuing their relationship with your business within a defined future period
@@ -218,16 +222,7 @@ BEGIN
     END IF;
 END$$;
 
--- Index on national_id if used for searching/matching
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_indexes
-        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_national_id'
-    ) THEN
-        CREATE INDEX idx_master_profiles_national_id ON cdp_master_profiles (national_id);
-    END IF;
-END$$;
+
 
 -- Index on first_seen_raw_profile_id if used for lookup or tracing lineage
 DO $$
