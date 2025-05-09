@@ -84,7 +84,7 @@ ALTER TABLE cdp_raw_profiles_stage DISABLE TRIGGER cdp_trigger_process_new_raw_p
 
 ## 🧪 5. SQL tạo bảng (rút gọn lại phần tạo index)
 
-Bạn có thể giữ nguyên SQL đã viết ở trên. Nếu cần, mình có thể giúp gộp thành một file `.sql` hoàn chỉnh để dễ quản lý Git/CI/CD.
+Xem file sql-scripts/04_raw_profiles_stage_table.sql
 
 ---
 
