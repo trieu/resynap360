@@ -3,7 +3,7 @@ import json
 import os
 import psycopg2
 import socket
-from processor import validate_phone_number, save_to_postgresql
+from processor import is_valid_basic_phone, validate_phone_number, save_to_postgresql
 
 # --- Configuration from environment variables ---
 DB_HOST = os.environ.get("DB_HOST")
@@ -12,25 +12,7 @@ DB_USER = os.environ.get("DB_USER")
 DB_PASS = os.environ.get("DB_PASS")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
-
-def lambda_handler(event, context):
-    print("🔥 [START] Lambda triggered by Firehose version 2025.05.06-09.41")
-
-    records = event.get("records", [])
-    output = []
-    db_connection = None
-
-    # --- Validate Configuration ---
-    missing_env = [var for var in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASS"] if not os.environ.get(var)]
-    if missing_env:
-        print(f"[CONFIG ERROR] Missing environment variables: {missing_env}")
-        return {
-            "records": [
-                {"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']}
-                for r in records
-            ]
-        }
-
+def check_db_connection(records):
     # --- Check Reachability & Connect ---
     try:
         print(f"[DEBUG] Attempting to reach DB at {DB_HOST}:{DB_PORT}")
@@ -58,7 +40,27 @@ def lambda_handler(event, context):
             ]
         }
 
+def lambda_handler(event, context):
+    print("🔥 [START] Lambda triggered by Firehose version 2025.05.06-09.41")
+
+    records = event.get("records", [])
+    
+    output = []
+    db_connection = True
+
+    # --- Validate Configuration ---
+    missing_env = [var for var in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASS"] if not os.environ.get(var)]
+    if missing_env:
+        print(f"[CONFIG ERROR] Missing environment variables: {missing_env}")
+        return {
+            "records": [
+                {"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']}
+                for r in records
+            ]
+        }
+
     # --- Process Each Record ---
+    valid_profiles = []
     for record in records:
         record_id = record.get("recordId", "N/A")
         print(f"✨ [PROCESSING] Record ID: {record_id}")
@@ -81,7 +83,7 @@ def lambda_handler(event, context):
             
             # check for phone_number
             phone_number = profile.get("phone_number")
-            if phone_number and not validate_phone_number(phone_number):
+            if phone_number and not is_valid_basic_phone(phone_number):
                 raise ValueError(f"Invalid or missing phone_number number: '{phone_number}'")
 
 
@@ -90,10 +92,8 @@ def lambda_handler(event, context):
             if first_name and not first_name:
                 raise ValueError("Missing required field: first_name")
             
-
-            save_to_postgresql(profile, db_connection)
-            print(f"✅ [SAVED] Record ID: {record_id}")
-
+            valid_profiles.append(profile)
+            
             output.append({
                 "recordId": record_id,
                 "result": "Ok",
@@ -107,6 +107,9 @@ def lambda_handler(event, context):
                 "result": "ProcessingFailed",
                 "data": record["data"]
             })
+
+    save_to_postgresql(valid_profiles, db_connection)
+
 
     # --- Close Connection ---
     if db_connection:
