@@ -30,9 +30,39 @@ BEGIN
             gender = COALESCE(p_raw_profile.gender, mp.gender),
             date_of_birth = COALESCE(p_raw_profile.date_of_birth, mp.date_of_birth),
 
-            -- Contact Info (prefer raw if not null)
-            email = COALESCE(p_raw_profile.email, mp.email),
-            phone_number = COALESCE(p_raw_profile.phone_number, mp.phone_number),
+            -- Primary Email Info
+            email = CASE
+                WHEN (mp.email IS NULL OR mp.email = '')
+                    AND (p_raw_profile.email IS NOT NULL AND p_raw_profile.email <> '')
+                THEN p_raw_profile.email
+                ELSE mp.email
+            END,
+
+            -- Secondary Emails
+            -- Rule: (if (mp.email is not null) and (p_raw_profile.email is not null) and (mp.email is not p_raw_profile.email) )
+            secondary_emails = CASE
+                WHEN mp.email IS NOT NULL AND p_raw_profile.email IS NOT NULL AND mp.email <> p_raw_profile.email THEN
+                    ARRAY(SELECT DISTINCT elem FROM unnest(COALESCE(mp.secondary_emails, '{}'::TEXT[]) || ARRAY[p_raw_profile.email]) AS elem
+                        WHERE elem IS NOT NULL AND elem <> '' AND elem <> mp.email)
+                ELSE mp.secondary_emails
+            END,
+            
+            -- Primary phone_number Info
+            phone_number = CASE
+                WHEN (mp.phone_number IS NULL OR mp.phone_number = '')
+                    AND (p_raw_profile.phone_number IS NOT NULL AND p_raw_profile.phone_number <> '')
+                THEN p_raw_profile.phone_number
+                ELSE mp.phone_number
+            END,
+
+            -- Secondary Phone Numbers
+            -- Rule: (if (mp.phone_number is not null) and (p_raw_profile.phone_number is not null) and (mp.phone_number is not p_raw_profile.phone_number) )
+            secondary_phone_numbers = CASE
+                WHEN mp.phone_number IS NOT NULL AND p_raw_profile.phone_number IS NOT NULL AND mp.phone_number <> p_raw_profile.phone_number THEN
+                    ARRAY(SELECT DISTINCT elem FROM unnest(COALESCE(mp.secondary_phone_numbers, '{}'::TEXT[]) || ARRAY[p_raw_profile.phone_number]) AS elem
+                        WHERE elem IS NOT NULL AND elem <> '' AND elem <> mp.phone_number)
+                ELSE mp.secondary_phone_numbers
+            END,
 
             -- Address (prefer raw if not null)
             address_line1 = COALESCE(p_raw_profile.address_line1, mp.address_line1),
@@ -148,7 +178,8 @@ EXCEPTION
 END $$;
 
 ----------------- resolve_customer_identities_dynamic -----------------------
-CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 1000)
+-- Main Logic Function (can be run manually)
+CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 10000)
 RETURNS VOID AS $$
 DECLARE
     r_profile cdp_raw_profiles_stage;
@@ -193,15 +224,15 @@ BEGIN
             v_identity_config_rec.threshold;
     END LOOP;
 
-    -- 2. Iterate through unprocessed raw profiles
+    -- 2. Iterate through unprocessed raw profiles (NO ANY LINK to master) 
     RAISE NOTICE '[RESOLVE_IDENTITIES] Processing up to % unprocessed raw profiles', batch_size;
     FOR r_profile IN
-        SELECT raw_profiles.*
-        FROM public.cdp_raw_profiles_stage as raw_profiles
-        LEFT JOIN public.cdp_profile_links as links
-        ON raw_profiles.raw_profile_id = links.raw_profile_id
-        WHERE links.raw_profile_id IS NULL -- Only process profiles not yet linked
-        AND raw_profiles.status_code = 1 -- Process only active raw profiles
+        SELECT * FROM cdp_raw_profiles_stage
+        WHERE status_code = 1
+            AND NOT EXISTS (
+                SELECT 1 FROM cdp_profile_links WHERE raw_profile_id = cdp_raw_profiles_stage.raw_profile_id
+            )
+        FOR UPDATE SKIP LOCKED
         LIMIT batch_size
     LOOP
         RAISE NOTICE '[RESOLVE_IDENTITIES] Processing raw_profile_id: % for tenant_id: %', r_profile.raw_profile_id, r_profile.tenant_id;

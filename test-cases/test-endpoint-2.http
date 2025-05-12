@@ -6,28 +6,33 @@ Content-Type: application/json
 Accept: application/json
 
 {
-  "schema_version": "2025.04.28",
-  "event_id": "5ed708ca-a682-4c26-969b-5c339554b5ea",
-  "tenant_id": "PNJ",
-  "datetime": "2025-05-06T04:00:00Z",
-  "unix_timestamp": 1746529570870,
-  "metric": "identify",
-  "visid": "2b02723f-2dcb-440b-8498-532331d76e8e",
-  "mediahost": "www.pnj.com.vn",
-  "tpurl": "https://www.pnj.com.vn/",
-  "profile_traits": {
-    "phone_number": "02839951703",
-    "first_name": "Thomas",
-    "last_name": "Nguyen",
-    "gender": "male",
-    "date_of_birth": "1990-05-20",
-    "loyalty_level": "gold",
-    "email": "trieu@example.com",
-    "source_system": "ecommerce",
-    "address_line1": "Phu Lam B",
-    "city": "Hochiminh City",
-    "ext_attributes": {
-      "referrer": "google"      
+    "schema_version": "2025.04.28",
+    "event_id": "5ed708ca-a682-4c26-969b-5c339554b5ea",
+    "tenant_id": "PNJ",
+    "datetime": "2025-05-06T04:00:00Z",
+    "unix_timestamp": 1746529570870,
+    "metric": "identify",
+    "visid": "4b02723f-2dcb-440b-8498-532331d76e8e",
+    "mediahost": "www.pnj.com.vn",
+    "tpurl": "https://www.pnj.com.vn/",
+    "profile_traits": 
+    {
+        "phone_number": "0903122293",
+        "first_name": "Trieu",
+        "last_name": "Nguyen",
+        "gender": "male",
+        "date_of_birth": "1986-08-16",
+        "email": "trieu@example.com",
+        "source_system": "ecommerce",
+        "address_line1": "Phu Lam B",
+        "city": "Hochiminh City",
+        "ext_attributes": 
+        {
+            "voucher_code": "FB2025-HELLO",
+            "referrer": "facebook",
+            "store_id": "store_001",
+            "source": "offline_redeem",
+            "loyalty_level": "gold"   
+        }
     }
-  }
 }
