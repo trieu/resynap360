@@ -7,7 +7,10 @@ CREATE TABLE cdp_raw_profiles_stage (
     tenant_id VARCHAR(36), -- ID của Tenant (khách hàng sử dụng CDP)
     source_system VARCHAR(100), -- Hệ thống nguồn của bản ghi
     received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    status_code SMALLINT DEFAULT 1, -- valid value: 1: is active, 0: deactivated (bị vô hiệu hóa), -1: need to delete
+
+    -- valid value: 3 = processed, 2 = in-progress, 1: is active and unprocessed 
+    --              0: deactivated, -1:  must delete
+    status_code SMALLINT DEFAULT 1, 
 
     -- core ID fields for identity resolution 
     email citext, -- Sử dụng kiểu citext cho email để tìm kiếm không phân biệt chữ hoa/thường
@@ -46,7 +49,10 @@ CREATE TABLE cdp_raw_profiles_stage (
     last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng, ví dụ: 'web', 'mobile', 'app', 'retail_store',... 
 
     -- Trường dữ liệu mở rộng dưới dạng JSONB
-    ext_attributes JSONB 
+    ext_attributes JSONB,
+
+    -- thời gian cuối cùng mà profile đã được xử lý
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() 
 );
 
 
