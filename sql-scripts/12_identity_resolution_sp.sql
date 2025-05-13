@@ -179,7 +179,7 @@ END $$;
 
 ----------------- resolve_customer_identities_dynamic -----------------------
 -- Main Logic Function (can be run manually)
-CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 10000)
+CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 100)
 RETURNS VOID AS $$
 DECLARE
     r_profile cdp_raw_profiles_stage;

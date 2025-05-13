@@ -1,103 +1,57 @@
-
 -- Main Logic Function (can be run manually)
-CREATE OR REPLACE FUNCTION process_new_raw_profiles()
-RETURNS void AS $$
+CREATE OR REPLACE PROCEDURE process_new_raw_profiles()
+LANGUAGE plpgsql
+AS $$
 DECLARE
-    _status RECORD;
-    _current_trigger_time TIMESTAMPTZ := NOW();
-    _delay_seconds INTEGER := 5;
-    _sp_actual_start_time TIMESTAMPTZ;
+    _unprocessed_count INTEGER;
+    _batch_size INTEGER := 20;
+    _total_max_process INTEGER := 1000;  -- Limit total records per session
+    _total_processed INTEGER := 0;
+    _to_process_this_batch INTEGER;
 BEGIN
-    -- Attempt to get an exclusive lock on the status row.
-    -- If another transaction has it (meaning another trigger fired and is active),
-    -- this statement will wait until that lock is released.
-    -- This is the primary mechanism for serialization and avoiding race conditions.
-    BEGIN
-        SELECT * INTO _status FROM cdp_id_resolution_status WHERE id = TRUE FOR UPDATE;
-    EXCEPTION
-        WHEN lock_not_available THEN
-            RAISE NOTICE '[TID:%] Could not acquire lock on cdp_id_resolution_status immediately. Another transaction may hold it. Trigger time: %',
-                         pg_backend_pid(), _current_trigger_time;
-            -- Depending on desired behavior, you might want to retry or simply exit.
-            -- For now, exiting as the other transaction should handle it.
-            RETURN;
-    END;
+    LOOP
+        -- Determine how many raw profiles are still unlinked
+        SELECT COUNT(*) INTO _unprocessed_count
+        FROM cdp_raw_profiles_stage r
+        LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
+        WHERE l.raw_profile_id IS NULL;
 
-    -- Check if another instance is already marked as processing.
-    -- This handles the case where multiple triggers fired, queued for the FOR UPDATE lock,
-    -- and the first one is now processing. Subsequent ones, after acquiring the lock,
-    -- will see is_processing = TRUE.
-    IF _status.is_processing THEN
-        RAISE NOTICE '[TID:%] SP execution is already in progress or scheduled by another trigger. is_processing=TRUE. Current trigger time: %, Lock holder started at: %',
-                     pg_backend_pid(), _current_trigger_time, _status.processing_started_at;
-        RETURN; -- Do nothing; let the other process complete. The FOR UPDATE lock is released at TX end.
-    END IF;
+        -- Exit if none left
+        EXIT WHEN _unprocessed_count = 0;
 
-    -- This trigger instance will handle the execution.
-    -- Mark that processing is starting and record the time.
-    UPDATE cdp_id_resolution_status
-    SET is_processing = TRUE,
-        processing_started_at = _current_trigger_time
-    WHERE id = TRUE;
-    -- The FOR UPDATE lock is still held by this transaction.
+        -- Compute how many to process in this batch (respecting total max limit)
+        _to_process_this_batch := LEAST(_batch_size, _total_max_process - _total_processed);
 
-    RAISE NOTICE '[TID:%] Lock acquired. is_processing set to TRUE. Will wait % seconds. Trigger time: %, Effective processing start: %',
-                 pg_backend_pid(), _delay_seconds, _current_trigger_time, _current_trigger_time;
+        -- Exit if we've reached the max allowed for this run
+        EXIT WHEN _to_process_this_batch <= 0;
 
-    -- Wait for the specified delay.
-    -- This pg_sleep happens *within* the transaction that fired the trigger.
-    -- This means the original INSERT/UPDATE statement that caused this trigger to fire
-    -- will not complete until this entire function (including the sleep and SP call) completes.
-    PERFORM pg_sleep(_delay_seconds);
+        -- Call identity resolution function for this batch
+        PERFORM resolve_customer_identities_dynamic(_to_process_this_batch);
 
-    -- Record the actual time the SP is called
-    _sp_actual_start_time := NOW();
-    BEGIN
-        RAISE NOTICE '[TID:%] Performing resolve_customer_identities_dynamic. Actual SP call at: % (after %s delay)',
-                     pg_backend_pid(), _sp_actual_start_time, _delay_seconds;
+        -- Commit the transaction after batch
+        COMMIT;
 
-        -- Call the identity resolution stored procedure
-        PERFORM resolve_customer_identities_dynamic();
-
-        -- Success: Update last execution timestamp and release the processing lock.
-        UPDATE cdp_id_resolution_status
-        SET last_successful_execution_completed_at = NOW(),
-            is_processing = FALSE,
-            processing_started_at = NULL -- Clear as processing is done
-        WHERE id = TRUE;
-        RAISE NOTICE '[TID:%] SP resolve_customer_identities_dynamic completed. is_processing set to FALSE.', pg_backend_pid();
-
-    EXCEPTION
-        WHEN OTHERS THEN
-            -- Error during SP execution: Release the processing lock but do not update last_successful_execution_completed_at.
-            UPDATE cdp_id_resolution_status
-            SET is_processing = FALSE,
-                processing_started_at = NULL -- Clear as processing attempt failed/ended
-            WHERE id = TRUE;
-            RAISE WARNING '[TID:%] Error during or after SP call for resolve_customer_identities_dynamic: %. is_processing set to FALSE.', pg_backend_pid(), SQLERRM;
-            -- Let the caller (manual or trigger) continue, but the SP logic encountered an issue.
-            RETURN;
-    END;
-    -- The FOR UPDATE lock on cdp_id_resolution_status row is released when this transaction commits.
+        -- Track how many we've processed
+        _total_processed := _total_processed + _to_process_this_batch;
+    END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
-CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- set process_new_raw_profiles in every minute
+CREATE EXTENSION IF NOT EXISTS pg_cron;
 SELECT cron.schedule(
     'process_new_profiles_every_minute',
     '* * * * *',  -- every minute
-    $$SELECT process_new_raw_profiles();$$
+    $$CALL process_new_raw_profiles();$$
 );
-
 
 -- Trigger Function (delegates to the above):
 CREATE OR REPLACE FUNCTION process_new_raw_profiles_trigger_func()
 RETURNS trigger AS $$
 BEGIN
     -- Delegate the logic to the main processing function
-    PERFORM process_new_raw_profiles();
+    CALL process_new_raw_profiles();
     RETURN NULL; -- Required for AFTER trigger, FOR EACH STATEMENT
 END;
 $$ LANGUAGE plpgsql;
