@@ -8,6 +8,8 @@ from psycopg2.extras import execute_values, Json
 import html
 import re
 import json
+from datetime import datetime
+
 
 # --- Helper Functions ---
 
@@ -134,21 +136,11 @@ sql_upsert_profile = """
         last_seen_touchpoint_url, last_known_channel,
         ext_attributes
     )
-    VALUES (
-        %s, %s, NOW(), 1,
-        %s, %s, %s, %s, %s, %s,
-        %s, %s, %s, %s,
-        %s, %s, %s, %s, %s, %s,
-        %s, %s,
-        %s, %s, %s,
-        %s, %s, %s,
-        %s, %s,
-        %s
-    )
+    VALUES %s -- the list of tuples
     ON CONFLICT (tenant_id, web_visitor_id) DO UPDATE SET
         source_system = EXCLUDED.source_system,
-        received_at = NOW(),
-        status_code = 1,
+        received_at = NOW(), -- Or EXCLUDED.received_at if you want to keep the original time on conflict
+        status_code = 1, -- Or EXCLUDED.status_code
         email = EXCLUDED.email,
         phone_number = EXCLUDED.phone_number,
         crm_contact_id = EXCLUDED.crm_contact_id,
@@ -177,23 +169,33 @@ sql_upsert_profile = """
         ext_attributes = EXCLUDED.ext_attributes;
 """
 
-def save_to_postgresql(profiles, connection):
+def save_to_postgresql(profiles, db_connection):
     if not profiles:
-        return
+        raise RuntimeError("❌ profiles is null or empty")
+    
+    if not isinstance(db_connection, psycopg2.extensions.connection):
+        raise RuntimeError("❌ Failed to connect to PostgreSQL")
 
     try:
-        values = []
-
+        deduped_profiles = {}
         for profile in profiles:
-            # Optional: skip invalid records
-            if not profile.get("tenant_id") or not profile.get("web_visitor_id"):
+            tenant_id = profile.get("tenant_id")
+            web_visitor_id = profile.get("web_visitor_id")
+            if not tenant_id or not web_visitor_id:
                 continue
+            key = (tenant_id.strip(), web_visitor_id.strip())
+            deduped_profiles[key] = profile  # Only keep the last occurrence
 
+        values = []
+        for key, profile in deduped_profiles.items():
+            phone_number = profile.get("phone_number")
             values.append((
                 sanitize_input(profile.get("tenant_id")),
                 sanitize_input(profile.get("source_system")),
+                datetime.utcnow(),  # received_at
+                1,  # status_code
                 sanitize_input(profile.get("email")),
-                sanitize_input(profile.get("phone_number")),
+                sanitize_input(phone_number),
                 sanitize_input(profile.get("web_visitor_id")),
                 sanitize_input(profile.get("crm_contact_id")),
                 sanitize_input(profile.get("crm_source_id")),
@@ -220,15 +222,16 @@ def save_to_postgresql(profiles, connection):
                 sanitize_input(profile.get("last_known_channel")),
                 Json(profile.get("ext_attributes") or {})
             ))
+            print(f"✅ [PROFILE] is ready to save with phone_number {phone_number}")
 
         if values:
-            with connection.cursor() as cursor:
+            with db_connection.cursor() as cursor:
                 execute_values(cursor, sql_upsert_profile, values)
-            connection.commit()
+            db_connection.commit()
             print(f"✅ [SAVED] save_to_postgresql, commit values: {len(values)}")
 
     except psycopg2.Error as db_error:
-        connection.rollback()
+        db_connection.rollback()
         raise db_error
     except Exception as e:
         raise e

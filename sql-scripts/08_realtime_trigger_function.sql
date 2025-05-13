@@ -82,6 +82,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+-- set process_new_raw_profiles in every minute
+SELECT cron.schedule(
+    'process_new_profiles_every_minute',
+    '* * * * *',  -- every minute
+    $$SELECT process_new_raw_profiles();$$
+);
+
 
 -- Trigger Function (delegates to the above):
 CREATE OR REPLACE FUNCTION process_new_raw_profiles_trigger_func()

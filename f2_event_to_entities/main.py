@@ -12,7 +12,17 @@ DB_USER = os.environ.get("DB_USER")
 DB_PASS = os.environ.get("DB_PASS")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
-def check_db_connection(records):
+BATCH_COMMIT_SIZE = 200   
+
+
+def lambda_handler(event, context):
+    print("🔥 [START] Lambda triggered by Firehose version 2025.05.06-09.41")
+
+    records = event.get("records", [])
+    
+    output = []
+    db_connection = None
+    
     # --- Check Reachability & Connect ---
     try:
         print(f"[DEBUG] Attempting to reach DB at {DB_HOST}:{DB_PORT}")
@@ -39,14 +49,6 @@ def check_db_connection(records):
                 for r in records
             ]
         }
-
-def lambda_handler(event, context):
-    print("🔥 [START] Lambda triggered by Firehose version 2025.05.06-09.41")
-
-    records = event.get("records", [])
-    
-    output = []
-    db_connection = True
 
     # --- Validate Configuration ---
     missing_env = [var for var in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASS"] if not os.environ.get(var)]
@@ -94,6 +96,11 @@ def lambda_handler(event, context):
             
             valid_profiles.append(profile)
             
+            if len(valid_profiles) >= BATCH_COMMIT_SIZE:
+                 # --- Save batch to PostgreSQL ---
+                save_to_postgresql(valid_profiles, db_connection)
+                valid_profiles = []
+            
             output.append({
                 "recordId": record_id,
                 "result": "Ok",
@@ -108,8 +115,9 @@ def lambda_handler(event, context):
                 "data": record["data"]
             })
 
-    save_to_postgresql(valid_profiles, db_connection)
-
+    if len(valid_profiles) >= 0:
+        # flush all to PostgreSQL
+        save_to_postgresql(valid_profiles, db_connection)
 
     # --- Close Connection ---
     if db_connection:
