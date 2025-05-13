@@ -8,7 +8,8 @@ from psycopg2.extras import execute_values, Json
 import html
 import re
 import json
-from datetime import datetime
+from datetime import datetime, timezone
+
 
 
 # --- Helper Functions ---
@@ -188,13 +189,19 @@ def save_to_postgresql(profiles, db_connection):
 
         values = []
         for key, profile in deduped_profiles.items():
+            
+            # 
+            status_code = 1
+            email = profile.get("email")
             phone_number = profile.get("phone_number")
+            received_at = datetime.now(timezone.utc)
+            
             values.append((
                 sanitize_input(profile.get("tenant_id")),
                 sanitize_input(profile.get("source_system")),
-                datetime.utcnow(),  # received_at
-                1,  # status_code
-                sanitize_input(profile.get("email")),
+                received_at,  
+                status_code, 
+                sanitize_input(email),
                 sanitize_input(phone_number),
                 sanitize_input(profile.get("web_visitor_id")),
                 sanitize_input(profile.get("crm_contact_id")),

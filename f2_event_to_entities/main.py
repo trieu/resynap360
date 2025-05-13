@@ -12,7 +12,7 @@ DB_USER = os.environ.get("DB_USER")
 DB_PASS = os.environ.get("DB_PASS")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
-BATCH_COMMIT_SIZE = 200   
+DB_BATCH_SIZE = int(os.environ.get("DB_BATCH_SIZE", "150"))   
 
 
 def lambda_handler(event, context):
@@ -96,7 +96,7 @@ def lambda_handler(event, context):
             
             valid_profiles.append(profile)
             
-            if len(valid_profiles) >= BATCH_COMMIT_SIZE:
+            if len(valid_profiles) >= DB_BATCH_SIZE:
                  # --- Save batch to PostgreSQL ---
                 save_to_postgresql(valid_profiles, db_connection)
                 valid_profiles = []

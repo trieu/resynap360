@@ -221,7 +221,6 @@ class C360User(HttpUser):
 
         # Payload of event
         EVENT_NAME = "identify"
-        
         payload = {
             "schema_version": "2025.04.28", 
             "event_id": str(uuid.uuid4()),
