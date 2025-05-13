@@ -191,8 +191,9 @@ DECLARE
     v_raw_value_text TEXT;
     v_master_col_name TEXT;
     v_dynamic_select_query TEXT;
-    v_start_time TIMESTAMPTZ := NOW();
+    v_start_time TIMESTAMPTZ;
 BEGIN
+    v_start_time := NOW(); 
     RAISE NOTICE '[RESOLVE_IDENTITIES] Bắt đầu xử lý với batch_size % tại thời điểm %', batch_size, v_start_time;
 
     -- Bước 1: Đánh dấu trước batch các bản ghi sẽ xử lý (status_code = 2 để tránh xử lý trùng khi chạy song song)

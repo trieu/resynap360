@@ -4,8 +4,8 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     _unprocessed_count INTEGER;
-    _batch_size INTEGER := 20;
-    _total_max_process INTEGER := 1000;  -- Limit total records per session
+    _batch_size INTEGER := 50;
+    _total_max_process INTEGER := 5000;  -- Limit total records per session
     _total_processed INTEGER := 0;
     _to_process_this_batch INTEGER;
 BEGIN
