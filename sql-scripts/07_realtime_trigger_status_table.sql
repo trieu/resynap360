@@ -1,16 +1,57 @@
 -- Bảng Metadata: cdp_id_resolution_status
 -- Bảng này dùng để theo dõi trạng thái và thời gian cuối cùng chạy của stored procedure chính
+
+-- Drop the old table if it exists
 DROP TABLE IF EXISTS cdp_id_resolution_status;
 
+-- Create the new optimized table for concurrent tasks in cdp_id_resolution_status
 CREATE TABLE cdp_id_resolution_status (
-    id BOOLEAN PRIMARY KEY DEFAULT TRUE, -- Chỉ cho phép một bản ghi duy nhất
-    last_successful_execution_completed_at TIMESTAMP WITH TIME ZONE, -- Thời gian stored procedure chính chạy thành công gần nhất
-    is_processing BOOLEAN DEFAULT FALSE, -- Cờ lock toàn cục: TRUE nếu SP đang được xử lý hoặc đang trong thời gian chờ 5s
-    processing_started_at TIMESTAMP WITH TIME ZONE, -- Thời điểm trigger bắt đầu quá trình xử lý (bao gồm cả delay)
-    CONSTRAINT enforce_one_row CHECK (id = TRUE) -- Đảm bảo chỉ có một bản ghi
+    -- Use BIGSERIAL for a simple, auto-incrementing primary key.
+    -- This is very efficient for selecting/claiming the next task.
+    id BIGSERIAL PRIMARY KEY,
+
+    tenant_id VARCHAR(36) NOT NULL, 
+
+    data_from_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
+    data_to_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
+
+    -- Status of the processing job for this specific time range and tenant
+    job_status VARCHAR(12) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'success', 'failed'
+
+    job_started_at TIMESTAMP WITH TIME ZONE, -- When a worker claimed this task
+    job_completed_at TIMESTAMP WITH TIME ZONE, -- When processing finished
+    error_message TEXT, -- Store error details if job_status is 'failed'
+
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
 
--- Chèn bản ghi duy nhất ban đầu nếu chưa tồn tại
-INSERT INTO cdp_id_resolution_status (id, last_successful_execution_completed_at, is_processing, processing_started_at)
-VALUES (TRUE, NULL, FALSE, NULL)
-ON CONFLICT (id) DO NOTHING;
+-- Add a unique constraint if the combination of tenant, from, and to should be unique
+-- This prevents the same task (for the same tenant and time range) from being queued multiple times.
+ALTER TABLE cdp_id_resolution_status
+ADD CONSTRAINT uq_cdp_id_resolution_status_tenant_range UNIQUE (tenant_id, data_from_datetime, data_to_datetime);
+
+-- Add indexes for efficient querying of pending tasks and by tenant
+-- The primary key 'id' is automatically indexed.
+CREATE INDEX idx_cdp_id_resolution_status_status_from_dt ON cdp_id_resolution_status (job_status, data_from_datetime);
+CREATE INDEX idx_cdp_id_resolution_status_tenant_id ON cdp_id_resolution_status (tenant_id);
+
+-- Optional: Index on job_started_at to find stalled tasks
+CREATE INDEX idx_cdp_id_resolution_status_job_started_at ON cdp_id_resolution_status (job_started_at, job_status);
+
+-- Optional: Add a function to update the updated_at column automatically
+CREATE OR REPLACE FUNCTION set_id_resolution_status_updated()
+RETURNS TRIGGER AS $$
+BEGIN
+   NEW.updated_at = now();
+   RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add a trigger to call the function before update
+CREATE TRIGGER trigger_set_id_resolution_status_updated
+BEFORE UPDATE
+ON cdp_id_resolution_status
+FOR EACH ROW
+EXECUTE PROCEDURE set_id_resolution_status_updated();
+

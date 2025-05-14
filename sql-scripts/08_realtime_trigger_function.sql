@@ -1,41 +1,59 @@
 -- Main Logic Function (can be run manually)
-CREATE OR REPLACE PROCEDURE process_new_raw_profiles()
+CREATE OR REPLACE PROCEDURE process_new_raw_profiles(
+    IN from_datetime TIMESTAMPTZ DEFAULT NULL,
+    IN to_datetime TIMESTAMPTZ DEFAULT NULL,
+    INOUT _total_processed INTEGER DEFAULT 0
+)
 LANGUAGE plpgsql
 AS $$
 DECLARE
     _unprocessed_count INTEGER;
-    _batch_size INTEGER := 50;
+    _batch_size INTEGER := 50;  -- default batch size
     _total_max_process INTEGER := 5000;  -- Limit total records per session
-    _total_processed INTEGER := 0;
     _to_process_this_batch INTEGER;
+    _from_ts TIMESTAMPTZ;
+    _to_ts TIMESTAMPTZ;
 BEGIN
+    -- Handle default values for datetime range
+    _to_ts := COALESCE(to_datetime, NOW());
+    _from_ts := COALESCE(from_datetime, _to_ts - INTERVAL '30 minutes');
+
+    -- Log time window for debugging
+    RAISE NOTICE 'Processing profiles from % to %', _from_ts, _to_ts;
+
     LOOP
-        -- Determine how many raw profiles are still unlinked
+        -- Count unprocessed records within the given time range
         SELECT COUNT(*) INTO _unprocessed_count
         FROM cdp_raw_profiles_stage r
         LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
-        WHERE l.raw_profile_id IS NULL;
+        WHERE l.raw_profile_id IS NULL
+          AND _from_ts <= r.received_at AND r.received_at < _to_ts
+          AND r.status_code = 1;
 
-        -- Exit if none left
+        -- Exit if nothing left
         EXIT WHEN _unprocessed_count = 0;
 
-        -- Compute how many to process in this batch (respecting total max limit)
+        -- Limit batch size based on remaining allowable total
         _to_process_this_batch := LEAST(_batch_size, _total_max_process - _total_processed);
-
-        -- Exit if we've reached the max allowed for this run
         EXIT WHEN _to_process_this_batch <= 0;
 
-        -- Call identity resolution function for this batch
-        PERFORM resolve_customer_identities_dynamic(_to_process_this_batch);
+        BEGIN
+            -- Pass time window and batch size into resolver 
+            -- PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
+            PERFORM resolve_customer_identities_dynamic(_to_process_this_batch);
 
-        -- Commit the transaction after batch
-        COMMIT;
+            -- Track processed count
+            _total_processed := _total_processed + _to_process_this_batch;
 
-        -- Track how many we've processed
-        _total_processed := _total_processed + _to_process_this_batch;
+            RAISE NOTICE 'Processed % profiles (total so far: %)', _to_process_this_batch, _total_processed;
+        EXCEPTION WHEN OTHERS THEN
+            -- Optional: log and continue
+            RAISE WARNING 'Error in batch: %, rolling back this batch', SQLERRM;
+        END;
     END LOOP;
 END;
 $$;
+
 
 
 -- set process_new_raw_profiles in every minute

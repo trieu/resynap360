@@ -48,3 +48,19 @@ CREATE TABLE cdp_profile_attributes (
     matching_threshold DECIMAL(5, 4) NULL, -- Ngưỡng cho fuzzy match (vd: 0.8)
     consolidation_rule VARCHAR(50) NULL -- Cách tổng hợp giá trị (vd: 'most_recent', 'non_null', 'concatenate', 'prefer_master', 'prefer_raw')
 );
+
+-- Clear existing attributes
+DELETE FROM cdp_profile_attributes;
+
+-- Insert default identity resolution attributes
+INSERT INTO cdp_profile_attributes (
+    id, name,  attribute_internal_code, data_type,
+    is_identity_resolution, matching_rule, matching_threshold,
+    consolidation_rule, status, is_index
+) VALUES
+(1, 'email', 'email', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
+(2, 'phone_number','phone_number', 'TEXT', TRUE, 'exact', NULL, 'non_null', 'ACTIVE', TRUE),
+(3,'social_user_id', 'social_user_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
+(4,'web_visitor_id', 'web_visitor_id', 'TEXT', TRUE, 'exact',NULL, 'most_recent', 'ACTIVE', TRUE),
+(5,'crm_source_id', 'crm_source_id', 'TEXT', TRUE, 'exact',NULL, 'prefer_master', 'ACTIVE', TRUE),
+;
