@@ -1,7 +1,6 @@
 -- Bảng 3: cdp_profile_links
 -- Liên kết các hồ sơ thô với hồ hồ sơ master tương ứng
 -- YÊU CẦU: Extension pgcrypto phải được cài đặt và kích hoạt để sử dụng hàm digest() cho SHA256.
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE cdp_profile_links (
     raw_profile_id UUID NOT NULL REFERENCES cdp_raw_profiles_stage(raw_profile_id),

@@ -1,6 +1,4 @@
 
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-
 SELECT cron.schedule(
     'daily_identity_resolution',
     '0 2 * * *', -- Mỗi ngày lúc 2:00 AM

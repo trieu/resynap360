@@ -57,7 +57,6 @@ $$;
 
 
 -- set process_new_raw_profiles in every minute
-CREATE EXTENSION IF NOT EXISTS pg_cron;
 SELECT cron.schedule(
     'process_new_profiles_every_minute',
     '* * * * *',  -- every minute
