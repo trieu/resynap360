@@ -214,3 +214,123 @@ You should see the query plan accessing only the relevant partition (`cdp_raw_pr
 * ✅ Supports time-based cleanup with retention policy.
 * ✅ Scales well for concurrent identity resolution, segmentation, and analytics.
 
+---
+
+Khi bạn **chạy SQL query** trên một bảng đã được **PARTITION BY RANGE** (ví dụ theo `received_at`), PostgreSQL không truy vấn toàn bộ bảng cha mà sẽ **partition prune** (cắt tỉa các partition không cần thiết), nếu truy vấn của bạn đủ rõ ràng. Dưới đây là flow chi tiết về cách PostgreSQL xử lý:
+
+---
+
+## 🔄 PostgreSQL Query Execution Flow với `PARTITION BY RANGE`
+
+### 1. 🗂 Query nhận vào từ client
+
+Bạn gửi câu truy vấn ví dụ:
+
+```sql
+SELECT * FROM cdp_raw_profiles_stage
+WHERE received_at BETWEEN '2025-05-15 09:00:00+07' AND '2025-05-15 10:00:00+07';
+```
+
+---
+
+### 2. 🔍 Query Planner (giai đoạn lập kế hoạch)
+
+#### a. PostgreSQL xác định:
+
+* Đây là bảng **partitioned table**
+* Có bao nhiêu partition con (`cdp_raw_profiles_stage_YYYYMMDD_HH`)
+
+#### b. **Partition Pruning**
+
+PostgreSQL kiểm tra từng partition con:
+
+* Nếu `received_at` range **không giao nhau** với range của partition → **loại bỏ**
+* Nếu có giao → giữ lại cho kế hoạch truy vấn
+
+✅ Nếu điều kiện `WHERE` đủ rõ (với giá trị tĩnh hoặc dùng `immutable functions`) → **pruning xảy ra tại planning time**.
+
+---
+
+### 3. ⚙️ Query Execution
+
+Chỉ những partition được giữ lại mới được truy vấn. PostgreSQL sẽ:
+
+* Truy cập chỉ các partition liên quan (ví dụ: `cdp_raw_profiles_stage_20250515_09`)
+* Áp dụng indexes nếu có
+* Trả kết quả hợp nhất về client
+
+---
+
+### 4. 🧠 Optimizations áp dụng (nếu bạn làm đúng)
+
+* **Parallel scan**: nếu bạn truy vấn range lớn (nhiều partition), Postgres có thể phân phối truy vấn qua nhiều worker.
+* **Bitmap index scan**: nếu index trên các partition đủ tốt
+* **Constraint exclusion / Partition pruning**: tiết kiệm IO cực lớn.
+
+---
+
+## 💥 Anti-patterns khiến partition không phát huy tác dụng
+
+| Tình huống                                                             | Hậu quả                                                                            |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `WHERE received_at = NOW()`                                            | ❌ Postgres không prune được partition tại planning time vì `NOW()` là **volatile** |
+| Không có `received_at` trong `WHERE`                                   | ❌ Toàn bộ partitions sẽ bị scan                                                    |
+| Join giữa partitioned table và bảng khác mà không lọc rõ `received_at` | ⚠ Có thể bị full scan hoặc inefficient join                                        |
+| Index chỉ tạo ở bảng cha                                               | ❌ Bị **bỏ qua** trong partition (phải index từng partition con)                    |
+
+---
+
+## ✅ Mẫu truy vấn hiệu quả
+
+```sql
+SELECT email, phone_number
+FROM cdp_raw_profiles_stage
+WHERE received_at >= '2025-05-15 00:00:00+07'
+  AND received_at <  '2025-05-16 00:00:00+07'
+  AND tenant_id = 'abc'
+  AND status_code = 1;
+```
+
+* Điều kiện time range rõ ràng ✅
+* Lọc theo indexable fields ✅
+* Prune được đúng các partition ✅
+
+---
+
+## 🧪 Xem kế hoạch thực tế
+
+```sql
+EXPLAIN ANALYZE
+SELECT * FROM cdp_raw_profiles_stage
+WHERE received_at BETWEEN '2025-05-15 09:00:00+07' AND '2025-05-15 10:00:00+07';
+```
+
+Output sẽ cho biết partition nào được truy cập. Nếu bạn thấy dòng như:
+
+```
+->  Seq Scan on cdp_raw_profiles_stage_20250515_09
+```
+
+là đã prune đúng partition.
+
+---
+
+## 📌 Tóm tắt flow
+
+```text
+[SQL Query]
+     ↓
+[Query Planner]
+     ↓
+[Partition Pruning]  ← ⛔ Bỏ qua nếu WHERE không rõ ràng
+     ↓
+[Choose Access Path: Seq Scan / Index Scan / Parallel Scan]
+     ↓
+[Execute on Matched Partitions Only]
+     ↓
+[Return Unified Results]
+```
+
+---
+
+Nếu bạn muốn mình vẽ một sơ đồ hoặc cung cấp query benchmark test cho từng bước, mình có thể hỗ trợ.
