@@ -12,12 +12,12 @@ Accept: application/json
     "datetime": "2025-05-06T04:00:00Z",
     "unix_timestamp": 1746529570870,
     "metric": "identify",
-    "visid": "4b02723f-2dcb-440b-8498-532331d76e8e",
+
     "mediahost": "www.pnj.com.vn",
     "tpurl": "https://www.pnj.com.vn/",
     "profile_traits": 
     {
-        "phone_number": "0903122293",
+        "phone_number": "840903122291",
         "first_name": "Trieu",
         "last_name": "Nguyen",
         "gender": "male",

@@ -17,4 +17,4 @@ def lambda_handler(event, context):
         Record={'Data': data}
     )
 
-    return {"statusCode": 200, "body": json.dumps({"message": "Data sent to Firehose", "firehose_response": response})}
+    return {"statusCode": 200, "body": json.dumps({"message": "c360-profile-track sent to Firehose  ", "firehose_response": response})}

@@ -77,9 +77,7 @@ def lambda_handler(event, context):
             
             web_visitor_id = event_data.get("visid")
             profile = event_data.get("profile_traits", {})
-            profile["tenant_id"] = tenant_id
-            
-            
+            profile["tenant_id"] = tenant_id         
             
             # if event has phone_number, check for valid phone_number  
             phone_number = profile.get("phone_number") # this is the field name in PGSQL table schema
