@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDP Master Profile View - Dynamic</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .profile-header {
+            background-color: #ffffff;
+            padding: 1.5rem;
+            border-bottom: 1px solid #dee2e6;
+            margin-bottom: 1.5rem;
+            border-radius: .25rem;
+        }
+        .profile-header h1 {
+            margin-bottom: 0.25rem;
+        }
+        .profile-header .text-muted {
+            font-size: 0.9rem;
+        }
+        .nav-tabs .nav-link {
+            font-weight: 500;
+        }
+        .tab-pane {
+            background-color: #ffffff;
+            padding: 1.5rem;
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 .25rem .25rem;
+            min-height: 300px; /* Ensure tabs have some height */
+        }
+        .form-label {
+            font-weight: 500;
+            color: #495057;
+        }
+        .badge-group .badge {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+       
+        .section-title {
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #343a40;
+            border-bottom: 2px solid #0d6efd;
+            padding-bottom: 0.5rem;
+        }
+         .section-title:first-child {
+            margin-top: 0;
+        }
+        .read-only-field {
+            background-color: #e9ecef;
+            padding: .375rem .75rem;
+            border-radius: .25rem;
+            border: 1px solid #ced4da;
+            min-height: calc(1.5em + .75rem + 2px);
+            word-break: break-word;
+        }
+        #behavioralChartContainer {
+            max-width: 700px;
+            margin: 20px auto;
+            height: 500px; /* Explicit height for the chart container */
+        }
+        #profile_avatar {
+            width: 135px;
+        }
+
+        .json-display {
+            background-color: #e9ecef;
+            padding: 6px;
+            border-radius: .25rem;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        .json-formatted-table td pre.json-cell-pre {
+            margin: 0;
+            font-size: 0.8rem; /* Slightly smaller for pre content */
+            white-space: pre-wrap; /* Allow wrapping for long JSON strings */
+            background-color: #f8f9fa; /* Light background for the pre block */
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .json-formatted-table { /* Ensure table respects container width */
+            table-layout: fixed; /* Can help with column widths if needed, or remove if causing issues */
+        }
+        .json-formatted-table td {
+            vertical-align: top; /* Align content to top if some cells have more content */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container-fluid mt-4 mb-4">
+        <div id="profileHeaderPlaceholder"></div>
+
+        <ul class="nav nav-tabs" id="profileTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="identity-tab-btn" data-bs-toggle="tab" data-bs-target="#identity-tab-content" type="button" role="tab" aria-controls="identity-tab-content" aria-selected="true"><i class="bi bi-person-badge me-1"></i>Core Identity</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="behavioral-tab-btn" data-bs-toggle="tab" data-bs-target="#behavioral-tab-content" type="button" role="tab" aria-controls="behavioral-tab-content" aria-selected="false"><i class="bi bi-activity me-1"></i>Behavioral</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="personal-tab-btn" data-bs-toggle="tab" data-bs-target="#personal-tab-content" type="button" role="tab" aria-controls="personal-tab-content" aria-selected="false"><i class="bi bi-person-lines-fill me-1"></i>Personal Info</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="contact-tab-btn" data-bs-toggle="tab" data-bs-target="#contact-tab-content" type="button" role="tab" aria-controls="contact-tab-content" aria-selected="false"><i class="bi bi-geo-alt-fill me-1"></i>Address & Location</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="preferences-tab-btn" data-bs-toggle="tab" data-bs-target="#preferences-tab-content" type="button" role="tab" aria-controls="preferences-tab-content" aria-selected="false"><i class="bi bi-sliders me-1"></i>Preferences</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="scoring-tab-btn" data-bs-toggle="tab" data-bs-target="#scoring-tab-content" type="button" role="tab" aria-controls="scoring-tab-content" aria-selected="false"><i class="bi bi-graph-up-arrow me-1"></i>Scoring & Value</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="segmentation-tab-btn" data-bs-toggle="tab" data-bs-target="#segmentation-tab-content" type="button" role="tab" aria-controls="segmentation-tab-content" aria-selected="false"><i class="bi bi-grid-3x3-gap-fill me-1"></i>Segmentation</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="extended-tab-btn" data-bs-toggle="tab" data-bs-target="#extended-tab-content" type="button" role="tab" aria-controls="extended-tab-content" aria-selected="false"><i class="bi bi-plug-fill me-1"></i>Extended Data</button>
+            </li>
+             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="metadata-tab-btn" data-bs-toggle="tab" data-bs-target="#metadata-tab-content" type="button" role="tab" aria-controls="metadata-tab-content" aria-selected="false"><i class="bi bi-info-circle-fill me-1"></i>Metadata</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="profileTabContent">
+            <div class="tab-pane fade show active" id="identity-tab-content" role="tabpanel" aria-labelledby="identity-tab-btn"></div>
+            <div class="tab-pane fade" id="behavioral-tab-content" role="tabpanel" aria-labelledby="behavioral-tab-btn"></div>
+            <div class="tab-pane fade" id="personal-tab-content" role="tabpanel" aria-labelledby="personal-tab-btn"></div>
+            <div class="tab-pane fade" id="contact-tab-content" role="tabpanel" aria-labelledby="contact-tab-btn"></div>
+            <div class="tab-pane fade" id="preferences-tab-content" role="tabpanel" aria-labelledby="preferences-tab-btn"></div>
+            <div class="tab-pane fade" id="scoring-tab-content" role="tabpanel" aria-labelledby="scoring-tab-btn"></div>
+            <div class="tab-pane fade" id="segmentation-tab-content" role="tabpanel" aria-labelledby="segmentation-tab-btn"></div>
+            <div class="tab-pane fade" id="extended-tab-content" role="tabpanel" aria-labelledby="extended-tab-btn"></div>
+            <div class="tab-pane fade" id="metadata-tab-content" role="tabpanel" aria-labelledby="metadata-tab-btn"></div>
+        </div> </div> <script id="profileHeaderTemplate" type="text/x-handlebars-template">
+        <div class="profile-header shadow-sm">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1>{{first_name}} {{last_name}} <span class="badge bg-primary fs-6 ms-2">Active</span></h1>
+                    <p class="text-muted mb-1">Master Profile ID: <span class="fw-bold">{{master_profile_id}}</span></p>
+                    <p class="text-muted mb-0">Tenant ID: <span class="fw-bold">{{tenant_id}}</span></p>
+                </div>
+                <div>
+                    <img id="profile_avatar" src="https://img.freepik.com/premium-vector/male-face-avatar-icon-set-flat-design-social-media-profiles_1281173-3806.jpg" class="rounded-circle" alt="Profile Picture">
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script id="identityTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Identity Details</h3>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Primary Email</label>
+                <div class="read-only-field">{{email}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Primary Phone Number</label>
+                <div class="read-only-field">{{phone_number}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Secondary Emails</label>
+                <div class="badge-group read-only-field">
+                    {{{formatArrayAsBadges secondary_emails 'bg-secondary'}}}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Secondary Phone Numbers</label>
+                <div class="badge-group read-only-field">
+                    {{{formatArrayAsBadges secondary_phone_numbers 'bg-secondary'}}}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Web Visitor IDs</label>
+                <div class="badge-group read-only-field">
+                    {{{formatArrayAsBadges web_visitor_ids 'bg-info text-dark'}}}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">National IDs (CCCD/CMND/SSN)</label>
+                <div class="badge-group read-only-field">
+                     {{{formatArrayAsBadges national_ids 'bg-warning text-dark'}}}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+             <div class="col-md-6 mb-3">
+                <label class="form-label">CRM Contact IDs</label>
+                <div class="json-display">
+{{{formatJson crm_contact_ids}}}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Social User IDs</label>
+                <div class="json-display">
+{{{formatJson social_user_ids}}}
+                </div>
+            </div>
+        </div>
+         <h4 class="mt-4 mb-3 sub-section-title">AI/ML Embeddings (Technical)</h4>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Identity Embedding</label>
+                <div class="read-only-field">{{#if identity_embedding}}Present ({{identity_embedding.dimensions}} dimensions){{else}}Not Available{{/if}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Persona Embedding</label>
+                <div class="read-only-field">{{#if persona_embedding}}Present ({{persona_embedding.dimensions}} dimensions){{else}}Not Available{{/if}}</div>
+            </div>
+        </div>
+    </script>
+
+    <script id="behavioralTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Behavioral Summary</h3>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Seen At</label>
+                <div class="read-only-field">{{formatDateTimeLocal last_seen_at}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Known Channel</label>
+                <div class="read-only-field">{{last_known_channel}}</div>
+            </div>
+        </div>
+         <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Seen Observer ID</label>
+                <div class="read-only-field">{{last_seen_observer_id}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Seen Touchpoint ID</label>
+                <div class="read-only-field">{{last_seen_touchpoint_id}}</div>
+            </div>
+        </div>
+        <div class="row">
+             <div class="col-md-12 mb-3">
+                <label class="form-label">Last Seen Touchpoint URL</label>
+                <div class="read-only-field">{{last_seen_touchpoint_url}}</div>
+            </div>
+        </div>
+        <h3 class="section-title mt-4">Recent Event Activity</h3>
+        <div id="behavioralChartContainer">
+            <canvas id="behavioralChart"></canvas>
+        </div>
+    </script>
+
+    <script id="personalTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Personal Information</h3>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">First Name</label>
+                <div class="read-only-field">{{first_name}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Name</label>
+                <div class="read-only-field">{{last_name}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Gender</label>
+                <div class="read-only-field">{{gender}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Date of Birth</label>
+                <div class="read-only-field">{{formatDate date_of_birth}}</div>
+            </div>
+        </div>
+    </script>
+
+    <script id="contactTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Address & Location</h3>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Address Line 1 (Tạm trú)</label>
+                <div class="read-only-field">{{address_line1}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Address Line 2 (Thường trú)</label>
+                <div class="read-only-field">{{address_line2}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">City</label>
+                <div class="read-only-field">{{city}}</div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">State/Province</label>
+                <div class="read-only-field">{{state}}</div>
+            </div>
+            <div class="col-md-2 mb-3">
+                <label class="form-label">Zip Code</label>
+                <div class="read-only-field">{{zip_code}}</div>
+            </div>
+             <div class="col-md-2 mb-3">
+                <label class="form-label">Country</label>
+                <div class="read-only-field">{{country}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Latitude</label>
+                <div class="read-only-field">{{latitude}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Longitude</label>
+                <div class="read-only-field">{{longitude}}</div>
+            </div>
+        </div>
+    </script>
+
+    <script id="preferencesTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Preferences & Localization</h3>
+         <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Preferred Language</label>
+                <div class="read-only-field">{{preferred_language}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Preferred Currency</label>
+                <div class="read-only-field">{{preferred_currency}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 mb-3">
+                <label class="form-label">Preferred Communication Channels</label>
+                <div class="json-display">
+{{{formatJson preferred_communication}}}
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script id="scoringTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Scoring & Customer Value</h3>
+        <div class="row">
+            <div class="col-md-3 mb-3">
+                <label class="form-label">Total Sessions</label>
+                <div class="read-only-field">{{total_sessions}}</div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label class="form-label">Total Purchases</label>
+                <div class="read-only-field">{{total_purchases}}</div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label class="form-label">Data Quality Score</label>
+                <div class="input-group">
+                    <div class="read-only-field flex-grow-1">{{data_quality_score}}</div>
+                    <span class="input-group-text">%</span>
+                </div>
+                <div class="form-text">Score out of 100 indicating profile completeness and accuracy.</div>
+            </div>
+             <div class="col-md-3 mb-3">
+                <label class="form-label">Lead Score</label>
+                <div class="read-only-field">{{lead_score}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Churn Probability</label>
+                 <div class="input-group">
+                    <div class="read-only-field flex-grow-1">{{churn_probability}}</div>
+                     <span class="input-group-text"><i class="bi bi-percent"></i></span>
+                </div>
+                 <div class="progress mt-1" role="progressbar" aria-label="Churn probability" aria-valuenow="{{multiply churn_probability 100}}" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+                    <div class="progress-bar bg-danger" style="width: {{multiply churn_probability 100}}%"></div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Customer Lifetime Value (CLTV)</label>
+                <div class="input-group">
+                    <span class="input-group-text">{{preferred_currency}}</span>
+                    <div class="read-only-field flex-grow-1">{{formatCurrency customer_lifetime_value}}</div>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script id="segmentationTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">AI/ML Segmentation</h3>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Customer Segments</label>
+                <div class="badge-group read-only-field">
+                    {{{formatArrayAsBadges customer_segments 'bg-success'}}}
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Persona Tags</label>
+                <div class="badge-group read-only-field">
+                     {{{formatArrayAsBadges persona_tags 'bg-primary'}}}
+                </div>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Data Labels</label>
+                 <div class="badge-group read-only-field">
+                    {{{formatArrayAsBadges data_labels 'bg-secondary'}}}
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-12 mb-3">
+                <label class="form-label">Customer Journeys</label>
+                <div class="json-display">
+{{{formatJson customer_journeys}}}
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script id="extendedTabTemplate" type="text/x-handlebars-template">
+        <h3 class="section-title">Extended Attributes & Event Summary</h3>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Domain-Specific Extended Attributes (ext_attributes)</label>
+                <div class="json-display">
+{{{formatJson ext_attributes}}}
+                </div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Aggregated Event Summary (event_summary)</label>
+                <div class="json-display">
+{{{formatJson event_summary}}}
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script id="metadataTabTemplate" type="text/x-handlebars-template">
+         <h3 class="section-title">Profile Metadata</h3>
+         <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Created At</label>
+                <div class="read-only-field">{{formatDateTimeLocal created_at}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Last Updated At</label>
+                <div class="read-only-field">{{formatDateTimeLocal updated_at}}</div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">First Seen Raw Profile ID</label>
+                <div class="read-only-field">{{first_seen_raw_profile_id}}</div>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Source Systems Contributing</label>
+                <div class="badge-group read-only-field">
+                    {{{formatArrayAsBadges source_systems 'bg-dark'}}}
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"  crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.7.8/handlebars.min.js"  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"  crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"  crossorigin="anonymous"></script>
+
+    <script>
+        $(document).ready(function() {
+            // --- Sample Profile Data ---
+            const profileData = {
+                master_profile_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                tenant_id: "tenant-xyz-123",
+                email: "nguyen.van.an@example.com",
+                secondary_emails: ["an.nguyen.test@example.com", "vanan.work@example.com"],
+                phone_number: "0901234567",
+                secondary_phone_numbers: ["0987654321"],
+                web_visitor_ids: ["ga_12345.67890", "fp_abcdef123456", "user_segment_cookie_xyz"],
+                national_ids: ["012345678912 (CCCD)"],
+                crm_contact_ids: { "salesforce_crm": "SF_CONTACT_001_AN", "hubspot_mkt_crm": "HS_LEAD_789_AN", "internal_crm": "INT_CUST_112233" },
+                social_user_ids: { "facebook": "an.nguyen.fb.123", "zalo": "0901234567_zalo_id", "linkedin": "vanan-nguyen-li" },
+                first_name: "Van An",
+                last_name: "Nguyen",
+                gender: "Male",
+                date_of_birth: "1990-05-15",
+                address_line1: "123 Duong ABC, Phuong XYZ, Quan 1",
+                address_line2: "456 Duong DEF, Xa UVW, Huyen Binh Chanh",
+                city: "Ho Chi Minh City",
+                state: "Ho Chi Minh City",
+                zip_code: "700000",
+                country: "Vietnam",
+                latitude: 10.7769,
+                longitude: 106.7009,
+                preferred_language: "vi",
+                preferred_currency: "VND",
+                preferred_communication: { "email": true, "sms": false, "zalo": true, "app_push": true, "newsletter_opt_in": true },
+                last_seen_at: "2025-05-14T10:30:00Z",
+                last_seen_observer_id: "observer-web-prod-01",
+                last_seen_touchpoint_id: "homepage-banner-promo-summer25",
+                last_seen_touchpoint_url: "https://example.com/promotion/summer2025?utm_campaign=summer_sale",
+                last_known_channel: "web",
+                total_sessions: 150,
+                total_purchases: 12,
+                data_quality_score: 85,
+                lead_score: 750,
+                churn_probability: 0.15,
+                customer_lifetime_value: 15500000,
+                customer_segments: ["frequent_traveler", "high_value_customer", "tech_savvy", "early_adopter_electronics"],
+                persona_tags: ["history_lover", "luxury_seeker", "budget_conscious_groceries"],
+                data_labels: ["internal_test_profile", "web_signup_campaign_q1_2025", "engaged_last_30_days"],
+                customer_journeys: {
+                    "onboarding_new_user_flow": { "status": "active", "current_stage": "Welcome Email Sent", "started_at": "2025-05-10T09:00:00Z", "last_activity_at": "2025-05-10T09:05:00Z" },
+                    "post_purchase_feedback_journey_TX123": { "status": "completed", "current_stage": "Feedback Received", "completed_at": "2025-04-20T14:00:00Z" }
+                },
+                created_at: "2024-01-10T14:20:00Z",
+                updated_at: "2025-05-15T09:15:00Z",
+                first_seen_raw_profile_id: "raw_prof_uuid_abc123_initial_web",
+                source_systems: ["Salesforce CRM", "Website Analytics", "Mobile App Backend", "POS System", "Marketing Automation Platform"],
+                ext_attributes: {
+                    "retail": { "loyalty_tier": "Gold", "last_purchase_date": "2025-04-15", "preferred_store_id": "STORE_HCM_01", "average_basket_size": 750000 },
+                    "travel": { "preferred_airline": "Vietnam Airlines", "passport_number_hashed": "**********", "travel_style": "adventure", "loyalty_program_id": "VN_GOLD_123" }
+                },
+                event_summary: { // Data for the chart
+                    "Page Views (Last 7d)": 125,
+                    "Product Detail Views (Last 7d)": 60,
+                    "Add to Cart (Last 7d)": 18,
+                    "Checkout Initiated (Last 7d)": 10,
+                    "Successful Purchase (Last 7d)": 7,
+                    "Support Ticket Created (Last 30d)": 2
+                },
+                identity_embedding: { type: "BERT", dimensions: 384, source: "internal_model_v2" }, // Example structure
+                persona_embedding: { type: "SentenceBERT", dimensions: 384, source: "interest_model_v1.2" } // Example structure
+            };
+
+            // --- Handlebars Helpers ---
+            Handlebars.registerHelper('getInitials', function(firstName, lastName) {
+                let initials = (firstName ? firstName[0] : '') + (lastName ? lastName[0] : '');
+                return initials.toUpperCase() || 'N/A';
+            });
+
+            Handlebars.registerHelper('formatArrayAsBadges', function(items, badgeClass) {
+                if (!items || !Array.isArray(items) || items.length === 0) {
+                    return '<span class="badge bg-light text-dark">N/A</span>';
+                }
+                return items.map(item => `<span class="badge ${Handlebars.escapeExpression(badgeClass)}">${Handlebars.escapeExpression(item)}</span>`).join(' ');
+            });
+
+            Handlebars.registerHelper('formatJson', function(jsonObj) {
+                // Helper function to escape HTML content
+                const escape = Handlebars.escapeExpression;
+
+                if (typeof jsonObj !== 'object' || jsonObj === null) {
+                    // For non-objects (null, undefined, primitives), return as escaped string or 'N/A'
+                    return jsonObj === null || typeof jsonObj === 'undefined' ?
+                        new Handlebars.SafeString('<span class="text-muted fst-italic">N/A</span>') :
+                        new Handlebars.SafeString(escape(String(jsonObj)));
+                }
+
+                let tableHtml = '<div class="table-responsive"><table class="table json-formatted-table table-hover table-bordered table-sm table-striped" style="background-color: #fff; font-size: 0.85rem; word-break: break-word;">';
+
+                if (Array.isArray(jsonObj)) {
+                    if (jsonObj.length === 0) {
+                        return new Handlebars.SafeString('<p class="text-muted fst-italic my-1">Empty array.</p>');
+                    }
+
+                    // Check if it's an array of primitives or objects
+                    const firstItem = jsonObj[0];
+                    if (typeof firstItem === 'object' && firstItem !== null && Object.keys(firstItem).length > 0) {
+                        // Array of objects: Use keys from the first object as headers
+                        const headers = Object.keys(firstItem);
+                        tableHtml += '<thead><tr>';
+                        headers.forEach(header => {
+                            tableHtml += `<th>${escape(header)}</th>`;
+                        });
+                        tableHtml += '</tr></thead>';
+
+                        tableHtml += '<tbody>';
+                        jsonObj.forEach(item => {
+                            tableHtml += '<tr>';
+                            headers.forEach(header => {
+                                let value = (typeof item === 'object' && item !== null) ? item[header] : ''; // Handle if item is not an object
+                                let valueDisplay;
+                                if (typeof value === 'object' && value !== null) {
+                                    valueDisplay = `<pre class="json-cell-pre">${escape(JSON.stringify(value, null, 2))}</pre>`;
+                                } else {
+                                    valueDisplay = escape(String(value === undefined || value === null ? '' : value));
+                                }
+                                tableHtml += `<td>${valueDisplay}</td>`;
+                            });
+                            tableHtml += '</tr>';
+                        });
+                        tableHtml += '</tbody>';
+                    } else {
+                        // Array of primitives (or empty/simple objects which will be stringified)
+                        tableHtml += '<thead><tr><th>Index</th><th>Value</th></tr></thead>';
+                        tableHtml += '<tbody>';
+                        jsonObj.forEach((item, index) => {
+                            tableHtml += '<tr>';
+                            tableHtml += `<td>${escape(String(index))}</td>`;
+                            let valueDisplay;
+                            if (typeof item === 'object' && item !== null) {
+                                valueDisplay = `<pre class="json-cell-pre">${escape(JSON.stringify(item, null, 2))}</pre>`;
+                            } else {
+                                valueDisplay = escape(String(item === undefined || item === null ? '' : item));
+                            }
+                            tableHtml += `<td>${valueDisplay}</td>`;
+                        });
+                        tableHtml += '</tbody>';
+                    }
+                } else { // It's an object (but not an array)
+                    const keys = Object.keys(jsonObj);
+                    if (keys.length === 0) {
+                        return new Handlebars.SafeString('<p class="text-muted fst-italic my-1">Empty object.</p>');
+                    }
+
+                    tableHtml += '<thead><tr><th>Key</th><th>Value</th></tr></thead>';
+                    tableHtml += '<tbody>';
+                    keys.forEach(key => {
+                        tableHtml += '<tr>';
+                        tableHtml += `<td style="font-weight: 500;">${escape(key)}</td>`;
+                        let value = jsonObj[key];
+                        let valueDisplay;
+                        if (typeof value === 'object' && value !== null) {
+                            valueDisplay = `<pre class="json-cell-pre">${escape(JSON.stringify(value, null, 2))}</pre>`;
+                        } else {
+                            // Handle boolean true/false explicitly for better display than "true"/"false" string
+                            if (typeof value === 'boolean') {
+                                valueDisplay = value ? 
+                                    '<span class="badge bg-success-subtle text-success-emphasis rounded-pill">True</span>' : 
+                                    '<span class="badge bg-danger-subtle text-danger-emphasis rounded-pill">False</span>';
+                            } else {
+                                valueDisplay = escape(String(value === undefined || value === null ? '' : value));
+                            }
+                        }
+                        tableHtml += `<td>${valueDisplay}</td>`;
+                        tableHtml += '</tr>';
+                    });
+                    tableHtml += '</tbody>';
+                }
+
+                tableHtml += '</table></div>'; // Added div.table-responsive
+                return new Handlebars.SafeString(tableHtml);
+            });
+
+            Handlebars.registerHelper('formatDate', function(dateString) {
+                if (!dateString) return 'N/A';
+                try {
+                    return new Date(dateString).toLocaleDateString('en-CA'); // YYYY-MM-DD
+                } catch (e) {
+                    return dateString;
+                }
+            });
+            
+            Handlebars.registerHelper('formatDateTimeLocal', function(dateString) {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    // Format to YYYY-MM-DDTHH:mm (suitable for datetime-local input)
+                    const year = date.getFullYear();
+                    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                    const day = date.getDate().toString().padStart(2, '0');
+                    const hours = date.getHours().toString().padStart(2, '0');
+                    const minutes = date.getMinutes().toString().padStart(2, '0');
+                    return `${year}-${month}-${day}T${hours}:${minutes}`;
+                } catch (e) {
+                    return dateString;
+                }
+            });
+
+
+            Handlebars.registerHelper('formatCurrency', function(number) {
+                if (typeof number !== 'number') return number;
+                return number.toLocaleString('vi-VN'); // Example: 15,500,000
+            });
+
+            Handlebars.registerHelper('multiply', function(val1, val2) {
+                return (parseFloat(val1) * parseFloat(val2)) || 0;
+            });
+            
+            // --- Compile and Render Templates ---
+            function renderTemplate(templateId, targetId, data) {
+                const source = $(templateId).html();
+                const template = Handlebars.compile(source);
+                const html = template(data);
+                $(targetId).html(html);
+            }
+
+            renderTemplate('#profileHeaderTemplate', '#profileHeaderPlaceholder', profileData);
+            renderTemplate('#identityTabTemplate', '#identity-tab-content', profileData);
+            renderTemplate('#behavioralTabTemplate', '#behavioral-tab-content', profileData); // Render before chart
+            renderTemplate('#personalTabTemplate', '#personal-tab-content', profileData);
+            renderTemplate('#contactTabTemplate', '#contact-tab-content', profileData);
+            renderTemplate('#preferencesTabTemplate', '#preferences-tab-content', profileData);
+            renderTemplate('#scoringTabTemplate', '#scoring-tab-content', profileData);
+            renderTemplate('#segmentationTabTemplate', '#segmentation-tab-content', profileData);
+            renderTemplate('#extendedTabTemplate', '#extended-tab-content', profileData);
+            renderTemplate('#metadataTabTemplate', '#metadata-tab-content', profileData);
+
+            // --- Chart.js Implementation for Behavioral Tab ---
+            function renderBehavioralChart() {
+                const ctx = document.getElementById('behavioralChart');
+                if (!ctx) return; // Canvas not found
+
+                const eventSummary = profileData.event_summary || {};
+                const chartableEvents = {};
+                const eventColors = [ // More distinct colors
+                    'rgba(54, 162, 235, 0.8)',  // Blue
+                    'rgba(255, 159, 64, 0.8)', // Orange
+                    'rgba(75, 192, 192, 0.8)',  // Green
+                    'rgba(255, 99, 132, 0.8)',  // Red
+                    'rgba(153, 102, 255, 0.8)',// Purple
+                    'rgba(255, 205, 86, 0.8)',  // Yellow
+                    'rgba(101, 186, 166, 0.8)', // Tealish
+                    'rgba(201, 203, 207, 0.8)'  // Grey
+                ];
+
+
+                // Filter out non-numeric values and sort by value descending for top N or just to have an order
+                let dataEntries = Object.entries(eventSummary)
+                    .filter(([key, value]) => typeof value === 'number')
+                    .sort(([,a], [,b]) => b - a); // Sort descending by count
+
+                const labels = dataEntries.map(entry => entry[0]);
+                const data = dataEntries.map(entry => entry[1]);
+                const backgroundColors = dataEntries.map((_, index) => eventColors[index % eventColors.length]);
+
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Event Counts',
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(color => color.replace('0.8', '1')), // Solid border
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y', // Horizontal bar chart for better readability of labels
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count'
+                                }
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Event Type'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false // Data is clear from axis labels
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.x !== null) {
+                                            label += context.parsed.x;
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Render chart when behavioral tab is shown to ensure canvas is visible
+            // Or if it's the default active tab, render immediately
+            if ($('#behavioral-tab-content').hasClass('show')) {
+                 renderBehavioralChart();
+            }
+            $('#behavioral-tab-btn').on('shown.bs.tab', function (e) {
+                // Check if chart already exists to prevent re-rendering
+                if (!Chart.getChart("behavioralChart")) { 
+                    renderBehavioralChart();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
