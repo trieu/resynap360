@@ -3,7 +3,7 @@ import json
 import os
 import psycopg2
 import socket
-from processor import is_valid_basic_phone, validate_phone_number, save_to_postgresql
+from processor import create_uuid_from_string, has_string_value, is_valid_basic_phone, is_valid_email, save_to_postgresql
 
 # --- Configuration from environment variables ---
 DB_HOST = os.environ.get("DB_HOST")
@@ -11,15 +11,12 @@ DB_NAME = os.environ.get("DB_NAME")
 DB_USER = os.environ.get("DB_USER")
 DB_PASS = os.environ.get("DB_PASS")
 DB_PORT = int(os.environ.get("DB_PORT", "5432"))
-
 DB_BATCH_SIZE = int(os.environ.get("DB_BATCH_SIZE", "150"))   
 
-
 def lambda_handler(event, context):
-    print("🔥 [START] Lambda triggered by Firehose version 2025.05.06-09.41")
+    print("🔥 [START] Lambda triggered. Using version 2025.05.15 10h")
 
     records = event.get("records", [])
-    
     output = []
     db_connection = None
     
@@ -70,43 +67,62 @@ def lambda_handler(event, context):
         try:
             decoded_bytes = base64.b64decode(record['data'])
             decoded_str = decoded_bytes.decode('utf-8')
+            #
             event_data = json.loads(decoded_str)
-            tenant_id = event_data.get("tenant_id")
+            
+            tenant_id = event_data.get("tenant_id",'')
+            observer_id = event_data.get("observer_id",'')
+            mediahost = event_data.get("mediahost",'')
+            schema_version = event_data.get("schema_version",'')
+            
             web_visitor_id = event_data.get("visid")
             profile = event_data.get("profile_traits", {})
+            profile["tenant_id"] = tenant_id
             
-            # Add tenant_id into the profile if available
-            if tenant_id:
-                profile["tenant_id"] = tenant_id
+            
+            
+            # if event has phone_number, check for valid phone_number  
+            phone_number = profile.get("phone_number") # this is the field name in PGSQL table schema
+            if has_string_value(phone_number) and not is_valid_basic_phone(phone_number):
+                raise ValueError(f"Invalid phone_number: '{phone_number}'")
 
-            # Add web_visitor_id into the profile if available
-            if web_visitor_id:
-                profile["web_visitor_id"] = web_visitor_id
+            # if event has email, check for valid email   
+            email = profile.get("email")
+            if has_string_value(email) and not is_valid_email(email):
+                raise ValueError(f"Invalid email: '{email}'")
             
-            # check for phone_number
-            phone_number = profile.get("phone_number")
-            if phone_number and not is_valid_basic_phone(phone_number):
-                raise ValueError(f"Invalid or missing phone_number number: '{phone_number}'")
-
-
-            # check for phone_number
-            first_name = profile.get("first_name")
-            if first_name and not first_name:
-                raise ValueError("Missing required field: first_name")
+            # check web_visitor_id to convert from event to entity
+            if has_string_value(web_visitor_id):
+                # mapping from JavaScript SDK Event Schema to PGSQL Table Schema
+                profile["phone_number"] =  profile.get("phone",  profile.get("phone_number"))
+                profile["first_name"] =  profile.get("firstname", profile.get("first_name") ) # get value of firstname with default is first_name
+                profile["first_name"] =  profile.get("name", profile.get("first_name")  )  # get value of name with default is first_name
+                profile["last_name"] =  profile.get("lastname", profile.get("last_name"))
+                profile["date_of_birth"] =  profile.get("birthday", profile.get("date_of_birth") )            
+                profile["crm_contact_id"] =  profile.get("userid", profile.get("crm_contact_id") ) # user of system is same as CRM contact info
+                profile["source_system"] =  profile.get("usersource", profile.get("source_system") ) # usersource is sourcesystem
+            else:
+                # If `web_visitor_id` is missing, it means the data likely came from the CRM or data lake. 
+                # In that case, try generating a hashed UUID using the `key_hint` value."**
+                key_hint = tenant_id + observer_id + mediahost + schema_version + phone_number + email
+                web_visitor_id = create_uuid_from_string(key_hint)
+                
+            # set web_visitor_id 
+            profile["web_visitor_id"] = web_visitor_id
             
-            valid_profiles.append(profile)
-            
+            # only save valid profiles
+            valid_profiles.append(profile) 
             if len(valid_profiles) >= DB_BATCH_SIZE:
                  # --- Save batch to PostgreSQL ---
                 save_to_postgresql(valid_profiles, db_connection)
+                # reset batch 
                 valid_profiles = []
-            
+             
             output.append({
                 "recordId": record_id,
                 "result": "Ok",
                 "data": record["data"]
             })
-
         except Exception as e:
             print(f"[ERROR] Record ID {record_id} failed: {str(e)}")
             output.append({
@@ -115,8 +131,8 @@ def lambda_handler(event, context):
                 "data": record["data"]
             })
 
-    if len(valid_profiles) >= 0:
-        # flush all to PostgreSQL
+    # check and flush all to PostgreSQL
+    if len(valid_profiles) > 0:        
         save_to_postgresql(valid_profiles, db_connection)
 
     # --- Close Connection ---

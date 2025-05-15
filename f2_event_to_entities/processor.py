@@ -9,12 +9,72 @@ import html
 import re
 import json
 from datetime import datetime, timezone
-
+import uuid
 
 
 # --- Helper Functions ---
 
-# basic sanitization to avoid XSS injection
+
+def create_uuid_from_string(input_string, namespace=uuid.NAMESPACE_DNS):
+  """
+  Creates a deterministic UUID (version 5) from a string using a specified namespace.
+
+  Args:
+    input_string: The string to generate the UUID from.
+    namespace: A UUID object representing the namespace. Defaults to uuid.NAMESPACE_DNS.
+               Use a consistent namespace for consistent results.
+
+  Returns:
+    A uuid.UUID object generated from the string and namespace.
+  """
+  # uuid.uuid5() takes the namespace UUID and the name (your string)
+  # It returns a UUID object
+  return uuid.uuid5(namespace, input_string)
+
+
+def has_string_value(data):
+    """
+    Checks if the input data is a non-empty string after removing leading/trailing whitespace.
+    Args:
+        data: The variable to check.
+    Returns:
+        True if data is a string and contains characters other than whitespace,
+        False otherwise (if it's not a string, or is an empty string, or contains only whitespace).
+    """
+    # Check if the data is an instance of a string
+    # This prevents errors if data is None, a number, a list, etc.
+    is_string = isinstance(data, str)
+
+    # If it's a string, check if it's non-empty after stripping whitespace
+    # data.strip() removes leading and trailing whitespace
+    # len(...) > 0 checks if there are any characters left
+    has_content = is_string and len(data.strip()) > 0
+
+    # Return True only if both conditions are met
+    return has_content
+
+
+def is_valid_email(email):
+  """
+  Checks if a string is a valid email address using a simple regular expression.
+
+  Args:
+    email: The string to check.
+
+  Returns:
+    True if the string is a valid email address, False otherwise.
+  """
+  # A simple regex for basic email validation.
+  # It checks for the presence of characters before and after the '@' symbol,
+  # and at least one dot in the domain part.
+  regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+  
+  # re.match() checks if the pattern matches at the beginning of the string.
+  # We use it here because a valid email should match the pattern from start to end.
+  if re.match(regex, email):
+    return True
+  else:
+    return False
 
 
 def sanitize_input(value):
@@ -119,11 +179,7 @@ def get_db_credentials(secret_name, region_name):
             f"An unexpected error occurred retrieving secret: {str(e)}")
 
 
-# Note: We commit per record here. For large batches,
-# a single commit after the loop might be more efficient,
-# but error handling becomes more complex (rollback on failure).
-# Committing per record ensures successfully processed records persist
-# even if later records in the batch fail.
+################# SQL to upsert profile #################
 
 sql_upsert_profile = """
     INSERT INTO public.cdp_raw_profiles_stage (
@@ -190,11 +246,11 @@ def save_to_postgresql(profiles, db_connection):
         values = []
         for key, profile in deduped_profiles.items():
             
-            # 
+            # received_at must be the value of system time UTC
+            received_at = datetime.now(timezone.utc)
             status_code = 1
             email = profile.get("email")
-            phone_number = profile.get("phone_number")
-            received_at = datetime.now(timezone.utc)
+            phone_number = profile.get("phone_number")            
             
             values.append((
                 sanitize_input(profile.get("tenant_id")),
@@ -229,7 +285,7 @@ def save_to_postgresql(profiles, db_connection):
                 sanitize_input(profile.get("last_known_channel")),
                 Json(profile.get("ext_attributes") or {})
             ))
-            print(f"✅ [PROFILE] is ready to save with phone_number {phone_number}")
+            print(f"✅ [PROFILE] is ready to save with phone_number {phone_number} email {email}")
 
         if values:
             with db_connection.cursor() as cursor:
