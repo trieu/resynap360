@@ -61,9 +61,9 @@ CREATE TABLE cdp_master_profiles (
     last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng
 
     -- Scoring data
-    total_sessions INT DEFAULT 1, -- ✔️ Good: tracks engagement volume
-    total_purchases INT, -- commercial intent
-    avg_order_value NUMERIC(12, 2), -- Average purchase value
+    total_sessions INT DEFAULT 1, -- tổng khối lượng phiên truy cập/tương tác)
+    total_purchases INT, -- tổng số lần mua hàng
+    avg_order_value NUMERIC(12, 2), -- Giá trị mua trung bình
     last_purchase_date DATE,
     data_quality_score INT,
     lead_score INT, -- can range from 0 to 100
