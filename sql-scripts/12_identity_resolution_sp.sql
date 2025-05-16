@@ -200,7 +200,7 @@ BEGIN
     v_start_time := NOW(); 
     RAISE NOTICE '[RESOLVE_IDENTITIES] Bắt đầu xử lý với batch_size % tại thời điểm %', batch_size, v_start_time;
 
-    -- Bước 1: Đánh dấu trước batch các bản ghi sẽ xử lý (status_code = 2 để tránh xử lý trùng khi chạy song song)
+    -- Bước 1: Đánh dấu trước batch
     WITH picked_rows AS (
         SELECT raw_profile_id
         FROM cdp_raw_profiles_stage
@@ -219,7 +219,7 @@ BEGIN
     FROM picked_rows p
     WHERE r.raw_profile_id = p.raw_profile_id;
 
-    -- Bước 2: Load lại các bản ghi đã được đánh dấu "in-progress" để xử lý
+    -- Bước 2: Load các bản ghi đã đánh dấu
     FOR r_profile IN
         SELECT * FROM cdp_raw_profiles_stage
         WHERE status_code = 2
@@ -233,7 +233,7 @@ BEGIN
         matched_master_id := NULL;
         v_where_conditions := '{}';
 
-        -- Bước 3: Nạp cấu hình IR nếu chưa có
+        -- Bước 3: Load cấu hình IR nếu chưa có
         IF identity_configs_array IS NULL THEN
             SELECT array_agg(
                 ROW(id, attribute_internal_code, data_type, matching_rule, matching_threshold, consolidation_rule)::identity_config_type
@@ -244,18 +244,17 @@ BEGIN
               AND status = 'ACTIVE'
               AND matching_rule IS NOT NULL
               AND matching_rule <> 'none';
-            
+
             IF identity_configs_array IS NULL OR array_length(identity_configs_array, 1) = 0 THEN
                 RAISE WARNING '[RESOLVE_IDENTITIES] Không có cấu hình IR đang hoạt động!';
                 RETURN;
             END IF;
         END IF;
 
-        -- Bước 4: Lặp qua các config để tạo điều kiện truy vấn
+        -- Bước 4: Build điều kiện
         FOREACH v_identity_config_rec IN ARRAY identity_configs_array LOOP
             v_raw_value_text := NULL;
 
-            -- Bước 4.1: Mapping attribute từ raw profile
             CASE v_identity_config_rec.attr_code
                 WHEN 'phone_number' THEN v_raw_value_text := r_profile.phone_number::TEXT;
                 WHEN 'crm_source_id' THEN v_raw_value_text := r_profile.crm_source_id::TEXT;
@@ -267,27 +266,26 @@ BEGIN
                         INTO v_raw_value_text;
                     EXCEPTION
                         WHEN OTHERS THEN
-                            RAISE WARNING '[RESOLVE_IDENTITIES] Lỗi lấy giá trị ext_attribute %: %', v_identity_config_rec.attr_code, SQLERRM;
+                            RAISE WARNING '[RESOLVE_IDENTITIES] Lỗi lấy ext_attr %: %', v_identity_config_rec.attr_code, SQLERRM;
                     END;
             END CASE;
 
-            -- Bước 4.2: Nếu giá trị hợp lệ thì build điều kiện
             IF v_raw_value_text IS NOT NULL AND (
                 (v_identity_config_rec.data_type IN ('VARCHAR', 'citext', 'TEXT') AND v_raw_value_text <> '')
                 OR v_identity_config_rec.data_type NOT IN ('VARCHAR', 'citext', 'TEXT')
             ) THEN
                 v_master_col_name := v_identity_config_rec.attr_code;
-                v_condition_text := '';
 
-                -- Bước 4.3: Build điều kiện theo matching rule
+                -- Matching Rule
                 CASE v_identity_config_rec.match_rule
                     WHEN 'exact' THEN
-                        v_condition_text := format('mp.%I IS NOT DISTINCT FROM %L', v_master_col_name, v_raw_value_text);
+                        v_condition_text := format('mp.%I = %L', v_master_col_name, v_raw_value_text);
                     WHEN 'fuzzy_trgm' THEN
                         IF v_identity_config_rec.threshold IS NOT NULL THEN
                             v_condition_text := format('similarity(mp.%I, %L) >= %s', v_master_col_name, v_raw_value_text, v_identity_config_rec.threshold);
                         ELSE
                             RAISE WARNING '[RESOLVE_IDENTITIES] fuzzy_trgm thiếu threshold cho attr %', v_master_col_name;
+                            CONTINUE;
                         END IF;
                     WHEN 'fuzzy_dmetaphone' THEN
                         v_condition_text := format('dmetaphone(mp.%I) = dmetaphone(%L)', v_master_col_name, v_raw_value_text);
@@ -296,20 +294,33 @@ BEGIN
                         CONTINUE;
                 END CASE;
 
-                IF v_condition_text <> '' THEN
-                    v_where_conditions := array_append(v_where_conditions, '(' || v_condition_text || ')');
-                END IF;
+                v_where_conditions := array_append(v_where_conditions, v_condition_text);
             END IF;
         END LOOP;
 
-        -- Bước 5: Thực thi dynamic SQL nếu có điều kiện
+        -- Bước 5: Dynamic SQL sử dụng UNION ALL
         IF array_length(v_where_conditions, 1) > 0 THEN
+            v_dynamic_select_query := '';
+
+            FOR i IN 1..array_length(v_where_conditions, 1) LOOP
+                IF i > 1 THEN
+                    v_dynamic_select_query := v_dynamic_select_query || ' UNION ALL ';
+                END IF;
+
+                v_dynamic_select_query := v_dynamic_select_query || format(
+                    'SELECT mp.master_profile_id FROM cdp_master_profiles mp WHERE mp.tenant_id = %L AND %s',
+                    r_profile.tenant_id,
+                    v_where_conditions[i]
+                );
+            END LOOP;
+
+            -- Lấy 1 bản ghi đầu tiên sau khi UNION
             v_dynamic_select_query := format(
-                'SELECT mp.master_profile_id FROM cdp_master_profiles mp WHERE mp.tenant_id IS NOT DISTINCT FROM %L AND (%s) LIMIT 1',
-                r_profile.tenant_id,
-                array_to_string(v_where_conditions, ' OR ')
+                'SELECT master_profile_id FROM (%s) AS unioned LIMIT 1',
+                v_dynamic_select_query
             );
-            RAISE NOTICE '[RESOLVE_IDENTITIES] Query động: %', v_dynamic_select_query;
+
+            RAISE NOTICE '[RESOLVE_IDENTITIES] Query động (UNION): %', v_dynamic_select_query;
 
             BEGIN
                 EXECUTE v_dynamic_select_query INTO matched_master_id;
@@ -320,14 +331,14 @@ BEGIN
             END;
         END IF;
 
-        -- Bước 6: Gọi hàm liên kết hoặc tạo mới master profile
+        -- Bước 6: Gọi hàm liên kết
         IF matched_master_id IS NOT NULL THEN
             matched_master_id := link_or_create_master_profile(r_profile, matched_master_id, 'DynamicMatch');
         ELSE
             matched_master_id := link_or_create_master_profile(r_profile, NULL, 'NewMaster');
         END IF;
 
-        RAISE NOTICE '[RESOLVE_IDENTITIES] raw_profile_id % đã được liên kết với master_profile_id: %',
+        RAISE NOTICE '[RESOLVE_IDENTITIES] raw_profile_id % được liên kết với master_profile_id: %',
             r_profile.raw_profile_id, COALESCE(matched_master_id::text, 'KHÔNG CÓ');
 
         -- Bước 7: Cập nhật trạng thái đã xử lý
