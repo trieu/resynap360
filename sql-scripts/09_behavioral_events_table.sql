@@ -10,6 +10,7 @@ CREATE TABLE cdp_behavioral_events (
 
     -- Core event information
     event_name VARCHAR(255) NOT NULL,                   -- Descriptive behavioral event name, e.g., 'product_viewed', 'form_submitted', 'chat_message_sent'.
+    event_type VARCHAR(50) DEFAULT 'behavioral' NOT NULL, -- e.g., 'habit_trigger', 'emotion_reaction', 'social_share'
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),  -- Timestamp when the event occurred or was recorded. Critical for 'id' generation, set by the application.
     source_system VARCHAR(100), -- systems contributing to this profile 
 
@@ -22,9 +23,15 @@ CREATE TABLE cdp_behavioral_events (
     mediahost VARCHAR(255) NOT NULL,        
     web_url TEXT NOT NULL,                         -- URL associated with the event (e.g., page URL, API endpoint). Part of 'id' source.
 
-    -- New fields for specific interaction types
+    -- STEPPS Fields: For analyzing why users talk/share content
+    -- Hiểu lý do chia sẻ: dựa trên cảm xúc, tính công khai, hoặc giá trị thực tiễn.
+    -- Phân nhóm hành vi viral: dùng trong AI/ML để dự đoán hoặc tối ưu nội dung.
     text_message TEXT,                                  -- For user chat messages, feedback text, or other textual input. Nullable.
     feedback_rating SMALLINT,                           -- For user-provided ratings (e.g., 1-5 stars). Nullable.
+    social_context TEXT[], -- e.g., ['shared_on_zalo', 'exclusive_offer_seen']
+    story_context TEXT; -- e.g., 'shared_trip_experience', 'complaint_story'
+    emotion TEXT, -- e.g., 'joy', 'surprise', 'awe', 'anger'
+    practical_value_type TEXT, -- e.g., 'tip', 'deal', 'how_to'
 
     -- Fields for product item tracking
     item_id VARCHAR(255),                        -- An original identifier from a source system if applicable (e.g., "GBXM00Y003665.000").
