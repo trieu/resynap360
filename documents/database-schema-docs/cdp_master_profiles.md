@@ -26,69 +26,110 @@ Mục đích chính của bảng này bao gồm:
 
 ### 2. Thiết kế bảng và giải thích từng trường
 
-Dưới đây là chi tiết về cấu trúc của bảng `cdp_master_profiles` và giải thích ý nghĩa của từng trường:
+## Tài liệu chi tiết các trường trong bảng `cdp_master_profiles`
 
-| Tên trường (Field Name)       | Kiểu dữ liệu (Data Type)         | Mặc định (Default)        | NULL? | Giải thích                                                                                                                                                                |
-| :---------------------------- | :------------------------------- | :------------------------ | :---- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `master_profile_id`           | UUID                             | `gen_random_uuid()`       | KHÔNG | ID duy nhất toàn cục cho mỗi hồ sơ master, là khóa chính của bảng.                                                                                                       |
-| `tenant_id`                   | VARCHAR(36)                      |                           | CÓ    | ID của Tenant (khách hàng doanh nghiệp sử dụng CDP), quan trọng cho môi trường đa khách hàng (multi-tenant).                                                              |
-| **Trường Định danh Cốt lõi (Core Identity Fields)** |                                  |                           |       |                                                                                                                                                                          |
-| `email`                       | CITEXT                           |                           | CÓ    | Địa chỉ email chính của khách hàng. `CITEXT` là kiểu text không phân biệt chữ hoa/thường, hữu ích cho việc tìm kiếm và đảm bảo tính duy nhất.                                 |
-| `secondary_emails`            | TEXT[]                           |                           | CÓ    | Mảng chứa các địa chỉ email phụ đã được xác minh của khách hàng.                                                                                                            |
-| `phone_number`                | VARCHAR(50)                      |                           | CÓ    | Số điện thoại chính của khách hàng (nên được chuẩn hóa).                                                                                                                   |
-| `secondary_phone_numbers`     | TEXT[]                           |                           | CÓ    | Mảng chứa các số điện thoại phụ đã được xác minh (nên được chuẩn hóa).                                                                                                      |
-| `web_visitor_ids`             | TEXT[]                           |                           | CÓ    | Mảng chứa các ID khách truy cập website (ví dụ: từ cookie) được liên kết với hồ sơ này.                                                                                      |
-| `national_ids`                | TEXT[]                           |                           | CÓ    | Mảng chứa các số định danh quốc gia (ví dụ: CCCD/CMND ở Việt Nam - thường 9 hoặc 12 số; SSN ở Mỹ - 9 số).                                                                      |
-| `crm_contact_ids`             | JSONB                            | `'{}'::jsonb`             | CÓ    | Đối tượng JSONB lưu trữ các ID liên hệ từ nhiều hệ thống CRM khác nhau. Ví dụ: `{ "salesforce_crm": "sf_id_123", "hubspot_mkt_crm": "hs_id_456" }`.                     |
-| `social_user_ids`             | JSONB                            | `'{}'::jsonb`             | CÓ    | Đối tượng JSONB lưu trữ ID người dùng từ các nền tảng mạng xã hội. Ví dụ: `{ "facebook": "fb_user_xxx", "zalo": "zalo_user_yyy" }`.                                       |
-| **Thông tin Cá nhân (Personal Information)** |                                  |                           |       |                                                                                                                                                                          |
-| `first_name`                  | VARCHAR(255)                     |                           | CÓ    | Tên của khách hàng. Ví dụ: 'Văn Anh' hoặc 'Anh'.                                                                                                                            |
-| `last_name`                   | VARCHAR(255)                     |                           | CÓ    | Họ của khách hàng. Ví dụ: 'Nguyễn'.                                                                                                                                      |
-| `gender`                      | VARCHAR(20)                      |                           | CÓ    | Giới tính của khách hàng. Ví dụ: 'male', 'female', 'unknown', 'other'. Nên có CHECK constraint.                                                                        |
-| `date_of_birth`               | DATE                             |                           | CÓ    | Ngày sinh của khách hàng.                                                                                                                                                    |
-| **Địa chỉ và Vị trí (Address and Location)** |                                  |                           |       |                                                                                                                                                                          |
-| `address_line1`               | VARCHAR(500)                     |                           | CÓ    | Địa chỉ dòng 1 (ví dụ: số nhà, tên đường, thường là địa chỉ tạm trú hoặc địa chỉ liên hệ chính).                                                                             |
-| `address_line2`               | VARCHAR(500)                     |                           | CÓ    | Địa chỉ dòng 2 (ví dụ: tên tòa nhà, số căn hộ, phường/xã, thường là địa chỉ thường trú nếu khác).                                                                            |
-| `city`                        | VARCHAR(255)                     |                           | CÓ    | Thành phố / Tỉnh.                                                                                                                                                            |
-| `state`                       | VARCHAR(255)                     |                           | CÓ    | Bang / Khu vực hành chính cấp cao hơn (nếu có).                                                                                                                                |
-| `zip_code`                    | VARCHAR(10)                      |                           | CÓ    | Mã bưu điện.                                                                                                                                                                 |
-| `country`                     | VARCHAR(100)                     |                           | CÓ    | Quốc gia.                                                                                                                                                                    |
-| `latitude`                    | DOUBLE PRECISION                 |                           | CÓ    | Vĩ độ, thường lấy từ API vị trí địa lý của ứng dụng di động hoặc các nguồn khác.                                                                                             |
-| `longitude`                   | DOUBLE PRECISION                 |                           | CÓ    | Kinh độ, thường lấy từ API vị trí địa lý của ứng dụng di động hoặc các nguồn khác.                                                                                              |
-| **Tùy chọn và Bản địa hóa (Preferences and Localization)** |                                  |                           |       |                                                                                                                                                                          |
-| `preferred_language`          | VARCHAR(20)                      |                           | CÓ    | Ngôn ngữ ưa thích của khách hàng cho giao tiếp. Ví dụ: 'vi', 'en'.                                                                                                           |
-| `preferred_currency`          | VARCHAR(10)                      |                           | CÓ    | Đơn vị tiền tệ ưa thích của khách hàng. Ví dụ: 'VND', 'USD'.                                                                                                                    |
-| `preferred_communication`     | JSONB                            | `'{}'::jsonb`             | CÓ    | Đối tượng JSONB lưu trữ các kênh liên lạc ưa thích. Ví dụ: `{ "email": true, "sms": false, "zalo": true, "push_notification": true }`.                                      |
-| **Tóm tắt Hành vi (Behavioral Summary)** |                                  |                           |       |                                                                                                                                                                          |
-| `last_seen_at`                | TIMESTAMPTZ                      | `NOW()`                   | CÓ    | Thời điểm cuối cùng khách hàng có hoạt động được ghi nhận (ví dụ: truy cập web, mở app, tương tác).                                                                       |
-| `last_seen_observer_id`       | VARCHAR(36)                      |                           | CÓ    | ID của hệ thống hoặc "quan sát viên sự kiện" (event observer) cuối cùng đã ghi nhận hành vi của người dùng.                                                                   |
-| `last_seen_touchpoint_id`     | VARCHAR(36)                      |                           | CÓ    | ID của điểm chạm (touchpoint) cuối cùng mà khách hàng tương tác.                                                                                                               |
-| `last_seen_touchpoint_url`    | VARCHAR(2048)                    |                           | CÓ    | URL của điểm chạm cuối cùng (nếu là web).                                                                                                                                      |
-| `last_known_channel`          | VARCHAR(50)                      |                           | CÓ    | Kênh tương tác cuối cùng được ghi nhận. Ví dụ: 'web', 'mobile_app', 'email_campaign', 'retail_store'.                                                                     |
-| **Trường Dữ liệu Tính điểm (Scoring Data Fields)** |                                  |                           |       |                                                                                                                                                                          |
-| `total_sessions`              | INT                              | `1`                       | CÓ    | Tổng số phiên truy cập web và/hoặc phiên đăng nhập ứng dụng, được tính toán từ dữ liệu sự kiện.                                                                                |
-| `total_purchases`             | INT                              |                           | CÓ    | Tổng số lần mua sản phẩm hoặc dịch vụ.                                                                                                                                         |
-| `data_quality_score`          | INT                              |                           | CÓ    | Điểm chất lượng dữ liệu của hồ sơ này, đánh giá mức độ đầy đủ và chính xác của thông tin.                                                                                       |
-| `lead_score`                  | INT                              |                           | CÓ    | Điểm khách hàng tiềm năng, thường được sử dụng trong marketing và sales để ưu tiên.                                                                                             |
-| `churn_probability`           | NUMERIC                          |                           | CÓ    | Xác suất rời bỏ (churn) dự đoán, ước tính khả năng khách hàng ngừng sử dụng dịch vụ/sản phẩm trong một khoảng thời gian nhất định.                                                   |
-| `customer_lifetime_value`     | NUMERIC                          |                           | CÓ    | Giá trị vòng đời khách hàng (CLV) dự đoán hoặc đã tính toán.                                                                                                                    |
-| **Trường Phân khúc AI/ML (AI/ML Segmentation Fields)** |                                  |                           |       |                                                                                                                                                                          |
-| `customer_segments`           | TEXT[]                           |                           | CÓ    | Mảng chứa các phân khúc khách hàng mà hồ sơ này thuộc về. Ví dụ: `['frequent_traveler', 'high_value_customer', 'tech_savvy']`.                                              |
-| `persona_tags`                | TEXT[]                           |                           | CÓ    | Mảng chứa các thẻ mô tả chân dung khách hàng (persona). Ví dụ: `['history_lover', 'luxury_traveler', 'budget_conscious']`.                                                   |
-| `data_labels`                 | TEXT[]                           |                           | CÓ    | Mảng chứa các nhãn dữ liệu tùy chỉnh. Ví dụ: `['internal_test_profile', 'email_opt_out', 'web_signup_campaign_q4_2024', 'gdpr_consent_given']`.                            |
-| `customer_journeys`           | JSONB                            | `'{}'::jsonb`             | CÓ    | Đối tượng JSONB theo dõi trạng thái của khách hàng trong các hành trình khác nhau. Ví dụ: `{"onboarding_series": {"status": "active", "current_stage": "Email 3 Sent"}}`.   |
-| **Siêu dữ liệu Hồ sơ (Metadata about Profile)** |                                  |                           |       |                                                                                                                                                                          |
-| `created_at`                  | TIMESTAMP WITH TIME ZONE         | `NOW()`                   | CÓ    | Thời điểm hồ sơ master này được tạo lần đầu tiên.                                                                                                                             |
-| `updated_at`                  | TIMESTAMP WITH TIME ZONE         | `NOW()`                   | CÓ    | Thời điểm hồ sơ master này được cập nhật lần cuối. Thường được quản lý bởi một trigger.                                                                                       |
-| `first_seen_raw_profile_id`   | UUID                             |                           | CÓ    | ID của bản ghi hồ sơ thô (`cdp_raw_profiles_stage.raw_profile_id`) đầu tiên đã được khớp và đóng góp vào việc tạo ra hồ sơ master này.                                            |
-| `source_systems`              | TEXT[]                           |                           | CÓ    | Mảng liệt kê tên các hệ thống nguồn (`cdp_raw_profiles_stage.source_system`) đã đóng góp dữ liệu vào hồ sơ master này.                                                           |
-| **Thuộc tính Mở rộng (Flexible Attributes)** |                                  |                           |       |                                                                                                                                                                          |
-| `ext_attributes`              | JSONB                            | `'{}'::jsonb`             | CÓ    | Đối tượng JSONB linh hoạt để lưu trữ các thuộc tính đặc thù theo từng lĩnh vực kinh doanh hoặc các thuộc tính mới phát sinh. Ví dụ: `{"retail": {"loyalty_tier": "Gold"}, "travel": {"preferred_airline": "VN"}}`. |
-| **Tóm tắt Hành vi từ Tổng hợp Sự kiện (Behavioral Summary from Event Aggregation)** |                |                           |       |                                                                                                                                                                          |
-| `event_summary`               | JSONB                            | `'{}'::jsonb`             | CÓ    | Đối tượng JSONB lưu trữ các tóm tắt hành vi được tổng hợp từ dữ liệu sự kiện. Ví dụ: `{"page_view_count": 150, "last_product_viewed_id": "prod_xyz", "total_login_count": 25}`. |
-| **Embeddings sẵn sàng cho ML/AI (ML/AI-ready Embeddings)** |                                  |                           |       |                                                                                                                                                                          |
-| `identity_embedding`          | VECTOR(384)                      |                           | CÓ    | Vector embedding đại diện cho các đặc trưng định danh (ví dụ: tên + email + SĐT) để tìm kiếm tương đồng mờ (fuzzy matching). Yêu cầu extension `pgvector`.                      |
-| `persona_embedding`           | VECTOR(384)                      |                           | CÓ    | Vector embedding đại diện cho các đặc trưng chân dung/sở thích/hành vi để tìm kiếm tương đồng về ngữ nghĩa. Yêu cầu extension `pgvector`.                                        |
+* SQL field: sql-scripts/05_master_profiles_table.sql
+
+Bảng `cdp_master_profiles` lưu trữ hồ sơ khách hàng chuẩn (golden record) sau khi đã thực hiện xử lý hợp nhất danh tính (identity resolution). Dưới đây là mô tả chi tiết cho từng trường:
+
+### 1. Thông tin định danh chính (Core identity fields)
+
+* `master_profile_id`: UUID tự sinh, định danh duy nhất của hồ sơ master.
+* `tenant_id`: ID định danh của khách hàng sử dụng hệ thống CDP (đa tenant).
+* `email`: Email chính, được chuẩn hóa và dùng để so khớp danh tính.
+* `secondary_emails`: Mảng email phụ đã xác thực, có thể đến từ các nguồn khác nhau.
+* `phone_number`: Số điện thoại chính.
+* `secondary_phone_numbers`: Mảng số điện thoại phụ.
+* `web_visitor_ids`: Danh sách ID của visitor khi duyệt web (cookie, fingerprint...).
+* `national_ids`: CCCD/CMND/SSN... định danh công dân.
+* `crm_contact_ids`: ID người dùng trên các CRM (dạng JSONB), ví dụ: `{"salesforce": "1234"}`.
+* `social_user_ids`: ID người dùng trên mạng xã hội như Facebook, Zalo, Google...
+
+### 2. Thông tin cá nhân (Personal information)
+
+* `first_name`: Tên.
+* `last_name`: Họ.
+* `gender`: Giới tính ('male', 'female', 'unknown'...).
+* `date_of_birth`: Ngày sinh.
+* `marital_status`: Tình trạng hôn nhân ('single', 'married'...).
+* `has_children`: Có con hay không.
+* `income_range`: Thu nhập ('under\_10M', '10M\_to\_30M'...).
+* `occupation`: Nghề nghiệp.
+* `industry`: Ngành nghề hoạt động.
+* `education_level`: Trình độ học vấn ('High School', 'Bachelor'...)
+
+### 3. Địa chỉ & vị trí (Address and location)
+
+* `address_line1`: Địa chỉ tạm trú.
+* `address_line2`: Địa chỉ thường trú.
+* `city`, `state`, `zip_code`, `country`: Thông tin địa lý.
+* `latitude`, `longitude`: Tọa độ địa lý.
+
+### 4. Thông tin hành vi và sở thích (Preferences & persona details)
+
+* `lifestyle`: Lối sống ('digital nomad', 'corporate traveler'...)
+* `pain_points`: Nỗi đau, vấn đề gặp phải ('khó lên lịch trình', 'rào cản ngôn ngữ'...)
+* `interests`: Sở thích ('lịch sử', 'ẩm thực đường phố'...)
+* `goals`: Mục tiêu cá nhân khi tương tác dịch vụ ('khám phá văn hóa', 'tiết kiệm chi phí')
+* `motivations`: Động lực sử dụng dịch vụ.
+* `personal_values`: Giá trị cá nhân ('bền vững', 'tính xác thực')
+* `spending_behavior`: Hành vi chi tiêu ('price-sensitive', 'premium-first')
+* `favorite_brands`: Thương hiệu yêu thích.
+
+### 5. Ngôn ngữ & giao tiếp (Localization & communication)
+
+* `preferred_language`: Ngôn ngữ ưa thích ('vi', 'en'...)
+* `preferred_currency`: Đơn vị tiền tệ ưa thích.
+* `preferred_communication`: Kênh liên lạc ưa thích (JSON), ví dụ: `{ "email": true, "sms": false }`
+* `preferred_shopping_channels`: Kênh mua sắm yêu thích ('online', 'retail\_store'...)
+* `preferred_locations`: Địa điểm yêu thích.
+* `preferred_contents`: Loại nội dung ưa thích ('video', 'review')
+
+### 6. Tổng hợp hành vi (Behavioral summary)
+
+* `last_seen_at`: Thời gian tương tác gần nhất.
+* `last_seen_observer_id`: ID hệ thống ghi nhận tương tác.
+* `last_seen_touchpoint_id`: ID điểm chạm cuối.
+* `last_seen_touchpoint_url`: URL tương tác cuối.
+* `last_known_channel`: Kênh tương tác cuối ('web', 'app', 'store'...)
+
+### 7. Scoring (Chấm điểm hành vi & tiềm năng)
+
+* `total_sessions`: Tổng số phiên truy cập web hoặc app.
+* `total_purchases`: Tổng số đơn hàng đã mua.
+* `avg_order_value`: Giá trị đơn hàng trung bình (đơn vị: VND).
+* `last_purchase_date`: Ngày mua gần nhất.
+* `data_quality_score`: Điểm đánh giá chất lượng dữ liệu (0-100).
+* `lead_score`: Điểm tiềm năng marketing (0-100), tính bằng ML hoặc heuristic.
+* `lead_score_model_version`: Phiên bản model chấm điểm lead.
+* `lead_score_last_updated`: Thời gian cập nhật lead\_score lần cuối.
+* `engagement_score`: Tổng hợp mức độ tương tác từ các sự kiện như pageview, click, time\_on\_site (thang điểm 0-100).
+* `recency_score`: Điểm tương tác gần đây (càng mới càng cao).
+* `churn_probability`: Xác suất rời bỏ (0-1), ví dụ: `0.8765` tương ứng 87.65%.
+* `customer_lifetime_value`: Tổng giá trị dự kiến mang lại (CLV).
+* `loyalty_tier`: Nhóm khách hàng trung thành ('Gold', 'Silver'...)
+
+### 8. AI/ML segmentation
+
+* `customer_segments`: Các phân khúc khách hàng ('high\_value', 'frequent\_traveler'...)
+* `persona_tags`: Nhãn nhận diện hành vi hoặc sở thích ('luxury\_traveler')
+* `data_labels`: Nhãn nội bộ ('email\_opt\_out', 'test\_user'...)
+* `customer_journeys`: Lưu tiến trình journey (onboarding, re-engagement...), ví dụ: `{ "onboarding": { "status": "completed" }}`
+* `next_best_actions`: Đề xuất hành động tiếp theo (JSON), ví dụ: `{ "campaign": "retarget_summer", "cta": "book_now" }`
+
+### 9. Metadata & nguồn gốc
+
+* `created_at`, `updated_at`: Timestamps tạo và cập nhật hồ sơ.
+* `first_seen_raw_profile_id`: ID raw profile đầu tiên đóng góp vào hồ sơ này.
+* `source_systems`: Danh sách hệ thống đóng góp dữ liệu (web, crm, app...)
+
+### 10. Trường mở rộng & embedding AI
+
+* `ext_attributes`: Trường mở rộng theo domain cụ thể.
+* `event_summary`: Tổng hợp hành vi dưới dạng JSON, ví dụ: `{ "page_view": 10, "purchase": 2 }`
+* `identity_embedding`: Vector định danh dùng cho so khớp mờ (AI).
+* `persona_embedding`: Vector mô tả hành vi, sở thích dùng cho gợi ý nội dung, sản phẩm.
+                                     |
 
 **Ghi chú về kiểu dữ liệu `VECTOR`:** Việc sử dụng kiểu `VECTOR(384)` đòi hỏi phải cài đặt và kích hoạt extension `pgvector` trong PostgreSQL. Nếu extension này không có sẵn, câu lệnh tạo bảng sẽ thất bại.
 

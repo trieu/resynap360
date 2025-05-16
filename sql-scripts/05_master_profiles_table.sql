@@ -1,7 +1,3 @@
-
--- Cài đặt các Extension cần thiết cho Personalization / Fuzzy identity Resolution
-CREATE EXTENSION IF NOT EXISTS vector;
-
 -- Bảng 2: cdp_master_profiles: Master profile table: golden record per resolved identity
 CREATE TABLE cdp_master_profiles (
     master_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), -- ID duy nhất cho hồ sơ master
@@ -10,22 +6,28 @@ CREATE TABLE cdp_master_profiles (
     -- Core identity fields of master profile
     email CITEXT,               -- primary email
     secondary_emails TEXT[],    -- Capture multiple verified emails
-    phone_number VARCHAR(50),       --  primary phone
+    phone_number VARCHAR(50),       -- primary phone
     secondary_phone_numbers TEXT[], -- Capture multiple verified phones
     web_visitor_ids TEXT[], -- Web visitor IDs associated with this profile
-    national_ids TEXT[], -- Vietnam (CCCD/CMND): Often 9 or 12 digits. United States: (Social Security Number - SSN): 9 digits,
+    national_ids TEXT[], -- CCCD/CMND, SSN...
     crm_contact_ids JSONB DEFAULT '{}'::jsonb, -- e.g., { "salesforce_crm": "123", "hubspot_mkt_crm": "456" }
     social_user_ids JSONB DEFAULT '{}'::jsonb, -- e.g., { "facebook": "xxx", "zalo": "yyy" }
-    
-    -- personal information
-    first_name VARCHAR(255), -- field mặc định name của profile. VD: 'Nguyen Van An hay 'Van An' đều OK
-    last_name VARCHAR(255), -- theo chuẩn quốc tế 
-    gender VARCHAR(20), -- ví dụ: 'male', 'female', 'unknown',...
-    date_of_birth DATE, 
 
-    -- Address and location for real-time personalization and shipping
-    address_line1 VARCHAR(500), -- temporary residence address (tạm trú)
-    address_line2 VARCHAR(500), -- permanent address (Địa chỉ thướng trú)
+    -- Personal information
+    first_name VARCHAR(255), -- VD: 'Nguyen Van An' hay 'Van An'
+    last_name VARCHAR(255),  -- theo chuẩn quốc tế 
+    gender VARCHAR(20),      -- ví dụ: 'male', 'female', 'unknown',...
+    date_of_birth DATE,
+    marital_status VARCHAR(50),
+    has_children BOOLEAN, -- Có con hay không (phục vụ nhóm gia đình)
+    income_range VARCHAR(100), -- e.g., "under_10M", "10M_to_30M", "30M_plus"
+    occupation VARCHAR(255),
+    industry VARCHAR(255),
+    education_level VARCHAR(100), -- e.g., 'Bachelor', 'High School'
+
+    -- Address and location
+    address_line1 VARCHAR(500), -- tạm trú
+    address_line2 VARCHAR(500), -- thường trú
     city VARCHAR(255),
     state VARCHAR(255),
     zip_code VARCHAR(10),
@@ -33,50 +35,71 @@ CREATE TABLE cdp_master_profiles (
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
 
-    -- Preferences and localization
+    -- Preferences & persona details
+    lifestyle TEXT, -- e.g., 'digital nomad', 'corporate traveler'
+    pain_points TEXT[], -- e.g., ['hard to plan trips', 'language barriers']
+    interests TEXT[], -- e.g., ['history', 'beach', 'street food']
+    goals TEXT[], -- e.g., ['explore new cultures', 'find affordable hotels']
+    motivations TEXT[], -- e.g., ['self-expression', 'family bonding']
+    personal_values TEXT[], -- e.g., ['sustainability', 'authenticity']
+    spending_behavior TEXT, -- e.g., 'price-sensitive', 'premium-first'
+    favorite_brands TEXT[], -- e.g., ['Nike', 'MUJI']
+
+    -- Localization & communication
     preferred_language VARCHAR(20), -- e.g., 'vi', 'en'
     preferred_currency VARCHAR(10), -- e.g., 'VND', 'USD'
     preferred_communication JSONB DEFAULT '{}'::jsonb, -- e.g., { "email": true, "sms": false, "zalo": true }
+    preferred_shopping_channels TEXT[], -- e.g., ['online', 'retail_store', 'mobile_app']
+    preferred_locations TEXT[],         -- e.g., ['Saigon Centre', 'Aeon Mall Tan Phu']
+    preferred_contents TEXT[] -- e.g., ['videos', 'reviews']
 
     -- Behavioral summary
     last_seen_at TIMESTAMPTZ DEFAULT NOW(), -- Thời gian sự kiện cuối cùng được ghi nhận
-    last_seen_observer_id VARCHAR(36), -- ID của event observer cuối cùng khi quan sát hành vi user
-    last_seen_touchpoint_id VARCHAR(36), -- ID của điểm chạm (touchpoint) cuối cùng
-    last_seen_touchpoint_url VARCHAR(2048), -- URL của điểm chạm (touchpoint) cuối cùng
-    last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng, ví dụ: 'web', 'mobile', 'app', 'retail_store',...
+    last_seen_observer_id VARCHAR(36), -- ID của event observer cuối cùng
+    last_seen_touchpoint_id VARCHAR(36), -- ID điểm chạm cuối cùng
+    last_seen_touchpoint_url VARCHAR(2048), -- URL điểm chạm cuối cùng
+    last_known_channel VARCHAR(50), -- Kênh tương tác cuối cùng
 
-    -- scoring data fields
-    total_sessions INT DEFAULT 1, -- Tổng số phiên truy cập web và phiên đăng nhập, tính toán từ sự kiện
-    total_purchases INT, -- total count of purchased product or service  
+    -- Scoring data
+    total_sessions INT DEFAULT 1, -- ✔️ Good: tracks engagement volume
+    total_purchases INT, -- commercial intent
+    avg_order_value NUMERIC(12, 2), -- Average purchase value
+    last_purchase_date DATE,
     data_quality_score INT,
-    lead_score INT, -- lead score for marketing analytics
-    churn_probability NUMERIC, --  a predictive metric that estimates the likelihood of a customer discontinuing their relationship with your business within a defined future period
-    customer_lifetime_value NUMERIC,
+    lead_score INT, -- can range from 0 to 100
+    lead_score_model_version VARCHAR(20),
+    lead_score_last_updated TIMESTAMPTZ,
+    engagement_score INT, -- Composite metric from events (pageviews, time on site, etc.)
+    recency_score INT,    -- Last seen recency score (e.g., 1–100 scale)
+    churn_probability NUMERIC(5, 4), -- e.g., 0.8765 (87.65%) Xác suất churn
+    customer_lifetime_value NUMERIC(12, 2) -- e.g., 10250000.00 VND, Long-term ROI
+    loyalty_tier VARCHAR(50), -- e.g., 'Gold', 'Silver'
 
-    -- AI/ML Segmentation fields
-    -- Customer segmentation (multi-tag support)
-    customer_segments TEXT[],       -- e.g., ['frequent_traveler', 'high_value']
+    -- AI/ML segmentation
+    customer_segments TEXT[], -- e.g., ['frequent_traveler', 'high_value']
     persona_tags TEXT[], -- e.g., ['history_lover', 'luxury_traveler']
-    data_labels TEXT[], -- e.g., ['internal_test_profile', 'email_opt_out', 'web_signup_campaign_q4']
-    customer_journeys JSONB DEFAULT '{}'::jsonb, -- e.g., {"onboarding_series": {"status": "active", "current_stage": "Email 3 Sent"}
+    data_labels TEXT[], -- e.g., ['internal_test_profile', 'email_opt_out']
+    customer_journeys JSONB DEFAULT '{}'::jsonb, -- e.g., {"onboarding_series": {"status": "active"}}
+    next_best_actions JSONB DEFAULT '{}'::jsonb, -- e.g., {"campaign": "luxury_summer_deals", "product_recommendation": ["P123", "P456"], "cta": "buy_now"}
 
-    -- Metadata about profile and 
+    -- Metadata & origin
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    first_seen_raw_profile_id UUID, -- ID of first raw profile that matched this master
-    source_systems TEXT[], -- List of systems contributing to this profile
+    first_seen_raw_profile_id UUID,
+    source_systems TEXT[], -- Các hệ thống đóng góp vào hồ sơ
 
-     -- Flexible attributes FOR MULTI-DOMAIN: Store domain-specific data here
-     -- e.g., {"retail": {"loyalty_tier": "Gold", "last_purchase_date": "2024-10-26"}, "travel": {"preferred_airline": "VN", "passport_number": "..."}}
-    ext_attributes JSONB DEFAULT '{}'::jsonb, 
+    -- Flexible attributes
+    ext_attributes JSONB DEFAULT '{}'::jsonb, -- Cho phép mở rộng theo domain
 
-    -- Behavioral summary from event aggregation
+    -- Behavioral event summary
     event_summary JSONB DEFAULT '{}'::jsonb, -- e.g., {"page_view": 5, "click": 2}
 
-    -- ML/AI-ready Embeddings
-    identity_embedding VECTOR(384), -- For fuzzy identity matching (e.g., name + email + phone)
-    persona_embedding VECTOR(384)   -- For semantic similarity (e.g., interest, behavior, content match)
+    -- Embedding fields for AI
+    identity_embedding VECTOR(384), -- Cho fuzzy identity resolution
+    persona_embedding VECTOR(384)   -- Cho gợi ý nội dung, sản phẩm, hành vi
 );
+
+------------------------------------------------------------------------------------
 
 -- FUNCTION để tự động cập nhật trường updated_at trong cdp_master_profiles
 CREATE OR REPLACE FUNCTION set_master_profile_updated_at()
