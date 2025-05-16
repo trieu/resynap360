@@ -179,7 +179,11 @@ END $$;
 
 ----------------- resolve_customer_identities_dynamic -----------------------
 -- Main Logic Function (can be run manually)
-CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(batch_size INT DEFAULT 100)
+CREATE OR REPLACE FUNCTION resolve_customer_identities_dynamic(
+    batch_size INT DEFAULT 100,
+    from_ts TIMESTAMPTZ DEFAULT NULL,
+    to_ts TIMESTAMPTZ DEFAULT NULL
+)
 RETURNS VOID AS $$
 DECLARE
     r_profile cdp_raw_profiles_stage;
@@ -204,7 +208,8 @@ BEGIN
           AND NOT EXISTS (
               SELECT 1 FROM cdp_profile_links WHERE raw_profile_id = cdp_raw_profiles_stage.raw_profile_id
           )
-        ORDER BY raw_profile_id
+          AND (from_ts IS NULL OR received_at >= from_ts)
+          AND (to_ts IS NULL OR received_at < to_ts)
         LIMIT batch_size
         FOR UPDATE
     )
@@ -218,6 +223,8 @@ BEGIN
     FOR r_profile IN
         SELECT * FROM cdp_raw_profiles_stage
         WHERE status_code = 2
+          AND (from_ts IS NULL OR received_at >= from_ts)
+          AND (to_ts IS NULL OR received_at < to_ts)
         ORDER BY updated_at
         LIMIT batch_size
     LOOP

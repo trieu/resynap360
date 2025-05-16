@@ -135,8 +135,37 @@ END$$;
 -- Indexes cho các Trường Định danh Chính (Primary Identifiers)
 --------------------------------------------------------------------------------
 
--- Index cho email chính (CITEXT) kết hợp với tenant_id
--- (Sửa đổi từ ví dụ của bạn để bao gồm tenant_id cho hiệu suất tốt hơn trong môi trường multi-tenant)
+-- Partial index cho email (không NULL)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_email_not_null'
+    ) THEN
+        CREATE INDEX idx_master_profiles_email_not_null ON cdp_master_profiles (email) 
+        WHERE email IS NOT NULL;
+        RAISE NOTICE 'Created index idx_master_profiles_email_not_null';
+    ELSE
+        RAISE NOTICE 'Index idx_master_profiles_email_not_null already exists';
+    END IF;
+END$$;
+
+-- Partial index cho phone_number (không NULL)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_phone_not_null'
+    ) THEN
+        CREATE INDEX idx_master_profiles_phone_not_null ON cdp_master_profiles (phone_number) 
+        WHERE phone_number IS NOT NULL;
+        RAISE NOTICE 'Created index idx_master_profiles_phone_not_null';
+    ELSE
+        RAISE NOTICE 'Index idx_master_profiles_phone_not_null already exists';
+    END IF;
+END$$;
+
+-- Index cho tenant_id, email
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -148,7 +177,7 @@ BEGIN
     END IF;
 END$$;
 
--- Index cho số điện thoại chính kết hợp với tenant_id (Như ví dụ của bạn, rất tốt)
+-- Index cho tenant_id + phone_number
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -156,6 +185,17 @@ BEGIN
         WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_tenant_id_phone'
     ) THEN
         CREATE INDEX idx_master_profiles_tenant_id_phone ON cdp_master_profiles (tenant_id, phone_number);
+    END IF;
+END$$;
+
+-- Index cho tenant_id + email+ phone_number
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_tenant_email_phone'
+    ) THEN
+        CREATE INDEX idx_master_profiles_tenant_email_phone ON cdp_master_profiles (tenant_id, email, phone_number);
     END IF;
 END$$;
 

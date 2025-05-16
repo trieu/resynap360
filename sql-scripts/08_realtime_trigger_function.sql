@@ -39,8 +39,7 @@ BEGIN
 
         BEGIN
             -- Pass time window and batch size into resolver 
-            -- PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
-            PERFORM resolve_customer_identities_dynamic(_to_process_this_batch);
+            PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
 
             -- Track processed count
             _total_processed := _total_processed + _to_process_this_batch;
