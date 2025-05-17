@@ -13,10 +13,20 @@ DECLARE
     _to_process_this_batch INTEGER;
     _from_ts TIMESTAMPTZ;
     _to_ts TIMESTAMPTZ;
+    _latest_ts TIMESTAMPTZ;
 BEGIN
+    SELECT r.received_at INTO _latest_ts
+    FROM cdp_raw_profiles_stage r
+    LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
+    WHERE l.raw_profile_id IS NULL AND r.status_code = 1
+    ORDER BY r.received_at DESC
+    LIMIT 1;
+
+    RAISE NOTICE 'Latest received_at: %', _latest_ts;
+
     -- Handle default values for datetime range
-    _to_ts := COALESCE(to_datetime, NOW());
-    _from_ts := COALESCE(from_datetime, _to_ts - INTERVAL '30 minutes');
+    _to_ts := COALESCE(to_datetime, _latest_ts);
+    _from_ts := COALESCE(from_datetime, _to_ts - INTERVAL '180 minutes');
 
     -- Log time window for debugging
     RAISE NOTICE 'Processing profiles from % to %', _from_ts, _to_ts;
@@ -27,7 +37,7 @@ BEGIN
         FROM cdp_raw_profiles_stage r
         LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
         WHERE l.raw_profile_id IS NULL
-          AND _from_ts <= r.received_at AND r.received_at < _to_ts
+          AND _from_ts <= r.received_at AND r.received_at <= _to_ts
           AND r.status_code = 1;
 
         -- Exit if nothing left

@@ -209,7 +209,7 @@ BEGIN
               SELECT 1 FROM cdp_profile_links WHERE raw_profile_id = cdp_raw_profiles_stage.raw_profile_id
           )
           AND (from_ts IS NULL OR received_at >= from_ts)
-          AND (to_ts IS NULL OR received_at < to_ts)
+          AND (to_ts IS NULL OR received_at <= to_ts)
         LIMIT batch_size
         FOR UPDATE
     )
@@ -224,7 +224,7 @@ BEGIN
         SELECT * FROM cdp_raw_profiles_stage
         WHERE status_code = 2
           AND (from_ts IS NULL OR received_at >= from_ts)
-          AND (to_ts IS NULL OR received_at < to_ts)
+          AND (to_ts IS NULL OR received_at <= to_ts)
         ORDER BY updated_at
         LIMIT batch_size
     LOOP
