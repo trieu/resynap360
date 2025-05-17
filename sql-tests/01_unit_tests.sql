@@ -5,6 +5,8 @@ CALL process_new_raw_profiles(
     '2025-05-13 23:30:00+07'   -- to_datetime (TIMESTAMPTZ)
 );
 
+CALL process_new_raw_profiles();
+
 SELECT COUNT(*) 
 FROM cdp_raw_profiles_stage r
 LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id

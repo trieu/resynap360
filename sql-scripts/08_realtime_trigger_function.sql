@@ -9,12 +9,14 @@ AS $$
 DECLARE
     _unprocessed_count INTEGER;
     _batch_size INTEGER := 50;  -- default batch size
-    _total_max_process INTEGER := 5000;  -- Limit total records per session
+    _total_max_process INTEGER := 5000;  -- limit total records per session
     _to_process_this_batch INTEGER;
     _from_ts TIMESTAMPTZ;
     _to_ts TIMESTAMPTZ;
     _latest_ts TIMESTAMPTZ;
+    _total_processed INTEGER := 0;
 BEGIN
+    -- Get the latest unlinked and active profile timestamp
     SELECT r.received_at INTO _latest_ts
     FROM cdp_raw_profiles_stage r
     LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
@@ -24,42 +26,37 @@ BEGIN
 
     RAISE NOTICE 'Latest received_at: %', _latest_ts;
 
-    -- Handle default values for datetime range
-    _to_ts := COALESCE(to_datetime, _latest_ts);
+    -- Define time window: from (latest - 180m) to (latest + 1m)
+    _to_ts := COALESCE(to_datetime, _latest_ts + INTERVAL '1 minute');
     _from_ts := COALESCE(from_datetime, _to_ts - INTERVAL '180 minutes');
 
-    -- Log time window for debugging
     RAISE NOTICE 'Processing profiles from % to %', _from_ts, _to_ts;
 
     LOOP
-        -- Count unprocessed records within the given time range
+        -- Count remaining unprocessed records in the time window
         SELECT COUNT(*) INTO _unprocessed_count
         FROM cdp_raw_profiles_stage r
         LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
         WHERE l.raw_profile_id IS NULL
-          AND _from_ts <= r.received_at AND r.received_at <= _to_ts
-          AND r.status_code = 1;
+          AND r.status_code = 1
+          AND r.received_at BETWEEN _from_ts AND _to_ts;
 
-        -- Exit if nothing left
         EXIT WHEN _unprocessed_count = 0;
 
-        -- Limit batch size based on remaining allowable total
         _to_process_this_batch := LEAST(_batch_size, _total_max_process - _total_processed);
         EXIT WHEN _to_process_this_batch <= 0;
 
         BEGIN
-            -- Pass time window and batch size into resolver 
             PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
-
-            -- Track processed count
             _total_processed := _total_processed + _to_process_this_batch;
 
             RAISE NOTICE 'Processed % profiles (total so far: %)', _to_process_this_batch, _total_processed;
         EXCEPTION WHEN OTHERS THEN
-            -- Optional: log and continue
             RAISE WARNING 'Error in batch: %, rolling back this batch', SQLERRM;
         END;
     END LOOP;
+    -- Final info for pg_cron return_message
+    RAISE INFO 'Total processed: %', _total_processed;
 END;
 $$;
 
