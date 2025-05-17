@@ -12,6 +12,55 @@ from datetime import datetime, timezone
 import uuid
 
 
+def convert_event_to_profile(record_data:str):
+    decoded_bytes = base64.b64decode(record_data)
+    decoded_str = decoded_bytes.decode('utf-8')
+    
+    # build json event_data
+    event_data = json.loads(decoded_str)
+    
+    tenant_id = event_data.get("tenant_id",'')
+    observer_id = event_data.get("observer_id",'')
+    mediahost = event_data.get("mediahost",'')
+    schema_version = event_data.get("schema_version",'')
+    
+    web_visitor_id = event_data.get("visid")
+    profile = event_data.get("profile_traits", {})
+    profile["tenant_id"] = tenant_id         
+    
+    # if event has phone_number, check for valid phone_number  
+    phone_number = profile.get("phone_number") # this is the field name in PGSQL table schema
+    if has_string_value(phone_number) and not is_valid_basic_phone(phone_number):
+        raise ValueError(f"Invalid phone_number: '{phone_number}'")
+
+    # if event has email, check for valid email   
+    email = profile.get("email")
+    if has_string_value(email) and not is_valid_email(email):
+        raise ValueError(f"Invalid email: '{email}'")
+    
+    # check web_visitor_id to convert from event to entity
+    if has_string_value(web_visitor_id):
+        # mapping from JavaScript SDK Event Schema to PGSQL Table Schema
+        profile["phone_number"] =  profile.get("phone",  profile.get("phone_number"))
+        profile["first_name"] =  profile.get("firstname", profile.get("first_name") ) # get value of firstname with default is first_name
+        profile["first_name"] =  profile.get("name", profile.get("first_name")  )  # get value of name with default is first_name
+        profile["last_name"] =  profile.get("lastname", profile.get("last_name"))
+        profile["date_of_birth"] =  profile.get("birthday", profile.get("date_of_birth") )            
+        profile["crm_contact_id"] =  profile.get("userid", profile.get("crm_contact_id") ) # user of system is same as CRM contact info
+        profile["source_system"] =  profile.get("usersource", profile.get("source_system") ) # usersource is sourcesystem
+    else:
+        # If `web_visitor_id` is missing, it means the data likely came from the CRM or data lake. 
+        # In that case, try generating a hashed UUID using the `key_hint` value."**
+        key_hint = tenant_id + observer_id + mediahost + schema_version + phone_number + email
+        web_visitor_id = create_uuid_from_string(key_hint)
+        
+    # set web_visitor_id 
+    profile["web_visitor_id"] = web_visitor_id
+    
+    return profile
+
+
+
 # --- Helper Functions ---
 
 
