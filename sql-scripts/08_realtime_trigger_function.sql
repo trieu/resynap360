@@ -78,3 +78,32 @@ BEGIN
     RETURN NULL; -- Required for AFTER trigger, FOR EACH STATEMENT
 END;
 $$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION cleanup_old_job_run_details(
+    older_than_interval INTERVAL DEFAULT INTERVAL '12 hours'
+) 
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM cron.job_run_details
+    WHERE end_time <= NOW() - older_than_interval;
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+
+    RAISE NOTICE 'Deleted % records older than %', deleted_count, older_than_interval;
+
+    RETURN deleted_count;
+END;
+$$;
+
+-- set cleanup_old_job_run_details_hourly in every hour
+SELECT cron.schedule(
+    'cleanup_old_job_run_details_hourly',
+    '0 * * * *',  -- every hour at minute 0
+    $$SELECT cleanup_old_job_run_details();$$
+);
+
