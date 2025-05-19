@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import uuid
 
 
+# convert event to profile, event is from queue
 def convert_event_to_profile(record_data:str):
     decoded_bytes = base64.b64decode(record_data)
     decoded_str = decoded_bytes.decode('utf-8')
@@ -303,7 +304,7 @@ def save_to_postgresql(profiles, db_connection):
             
             values.append((
                 sanitize_input(profile.get("tenant_id")),
-                sanitize_input(profile.get("source_system")),
+                sanitize_input(profile.get("source_system","websdk")),
                 received_at,  
                 status_code, 
                 sanitize_input(email),
@@ -314,7 +315,7 @@ def save_to_postgresql(profiles, db_connection):
                 sanitize_input(profile.get("social_user_id")),
                 sanitize_input(profile.get("first_name")),
                 sanitize_input(profile.get("last_name")),
-                sanitize_input(profile.get("gender")),
+                sanitize_input(profile.get("gender","unknown")),
                 sanitize_input(profile.get("date_of_birth")),
                 sanitize_input(profile.get("address_line1")),
                 sanitize_input(profile.get("address_line2")),
