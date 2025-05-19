@@ -1,15 +1,18 @@
 -- Summary Reports:
 -- Truy vấn này cung cấp cái nhìn tổng quát về hệ thống phân giải định danh trong CDP, bao gồm các chỉ số chính:
 -- Các chỉ số này giúp đánh giá hiệu quả của quá trình phân giải định danh và mức độ bao phủ dữ liệu trong toàn hệ thống.
+-- Summary Reports:
+-- Truy vấn này cung cấp cái nhìn tổng quát về hệ thống phân giải định danh trong CDP, bao gồm các chỉ số chính:
+-- Các chỉ số này giúp đánh giá hiệu quả của quá trình phân giải định danh và mức độ bao phủ dữ liệu trong toàn hệ thống.
 SELECT
-	-- 1. unique_master_profiles: Tổng số hồ sơ chính (master profile) hiện có trong hệ thống.
-  (SELECT COUNT(*) FROM cdp_master_profiles) AS unique_master_profiles,
-
-  -- 2. unique_master_links: Số lượng hồ sơ chính đã được liên kết với ít nhất một hồ sơ thô (raw profile).
-  (SELECT COUNT(DISTINCT master_profile_id) FROM cdp_profile_links) AS unique_master_links,
-
-  -- 3. total_raw_profiles: Tổng số hồ sơ thô đã được ghi nhận vào bảng tạm (staging) – đang chờ hoặc đang được xử lý phân giải định danh.
+	-- 1. total_master_profiles: Tổng số hồ sơ chính (master profile) hiện có trong hệ thống.
+  (SELECT COUNT(*) FROM cdp_master_profiles) AS total_master_profiles,
+  
+    -- 2. total_raw_profiles: Tổng số hồ sơ thô đã được ghi nhận vào bảng tạm (staging) – đang chờ hoặc đang được xử lý phân giải định danh.
   (SELECT COUNT(*) FROM cdp_raw_profiles_stage) AS total_raw_profiles,
+
+  -- 3. unique_master_links: Số lượng hồ sơ chính đã được liên kết với ít nhất một hồ sơ thô (raw profile).
+  (SELECT COUNT(DISTINCT master_profile_id) FROM cdp_profile_links) AS unique_master_links,
 
   -- 4. unique_raw_links: Số lượng hồ sơ thô đã được liên kết thành công với một hồ sơ chính.
   (SELECT COUNT(DISTINCT raw_profile_id) FROM cdp_profile_links) AS unique_raw_links,

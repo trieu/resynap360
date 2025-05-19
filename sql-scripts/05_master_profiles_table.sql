@@ -96,7 +96,9 @@ CREATE TABLE cdp_master_profiles (
 
     -- Embedding fields for AI
     identity_embedding VECTOR(384), -- Cho fuzzy identity resolution
-    persona_embedding VECTOR(384)   -- Cho gợi ý nội dung, sản phẩm, hành vi
+    persona_embedding VECTOR(384),   -- Cho gợi ý nội dung, sản phẩm, hành vi
+    -- valid value: 1: is active , 0: deactivated, -1:  must delete, 2 should be notified 
+    status_code SMALLINT DEFAULT 10 
 );
 
 ------------------------------------------------------------------------------------
@@ -516,6 +518,63 @@ BEGIN
     END IF;
 END$$;
 
+-- add the chk_status_code_valid constraint, must -1 <= status_code <= 10
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'chk_status_code_valid'
+          AND conrelid = 'cdp_master_profiles'::regclass
+    ) THEN
+        ALTER TABLE cdp_master_profiles
+        ADD CONSTRAINT chk_status_code_valid
+        CHECK (status_code >= -1 AND status_code <= 10);
+    END IF;
+END$$;
+
+DO $$
+BEGIN
+    -- Index on status_code
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_status_code'
+    ) THEN
+        CREATE INDEX idx_master_profiles_status_code
+        ON cdp_master_profiles (status_code);
+    END IF;
+
+    -- Composite index on tenant_id and status_code
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_tenant_status'
+    ) THEN
+        CREATE INDEX idx_master_profiles_tenant_status
+        ON cdp_master_profiles (tenant_id, status_code);
+    END IF;
+
+    -- Partial index for notified status (status_code = 10)
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_status_notified'
+    ) THEN
+        CREATE INDEX idx_master_profiles_status_notified
+        ON cdp_master_profiles (tenant_id)
+        WHERE status_code = 10;
+    END IF;
+
+    -- Partial index for active status (status_code = 1)
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_status_active'
+    ) THEN
+        CREATE INDEX idx_master_profiles_status_active
+        ON cdp_master_profiles (tenant_id)
+        WHERE status_code = 1;
+    END IF;
+END$$;
+
+
 --------------------------------------------------------------------------------
 -- Indexes cho Vector Embeddings (YÊU CẦU EXTENSION pgvector)
 --------------------------------------------------------------------------------
@@ -571,3 +630,4 @@ BEGIN
     END IF;
 END$$;
 */
+

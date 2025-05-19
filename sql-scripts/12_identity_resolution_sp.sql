@@ -108,7 +108,8 @@ BEGIN
                 ELSE mp.social_user_ids
             END,
             ext_attributes = COALESCE(mp.ext_attributes, '{}'::jsonb) || COALESCE(p_raw_profile.ext_attributes, '{}'::jsonb),
-            updated_at = NOW()
+            updated_at = NOW(),
+            status_code = 10 
         WHERE mp.master_profile_id = v_final_master_id;
         RAISE NOTICE '[LINK_OR_CREATE] Updated master_profile_id % with raw_profile_id % data', v_final_master_id, p_raw_profile.raw_profile_id;
 
@@ -351,3 +352,29 @@ BEGIN
     RAISE NOTICE '[RESOLVE_IDENTITIES] Kết thúc xử lý lúc %, tổng thời gian: %', NOW(), NOW() - v_start_time;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- update (set status_code is 1 ) and return all master_profile_id need to be notified (WHERE status_code = 10)
+CREATE OR REPLACE FUNCTION update_master_profiles_status(batch_size INT DEFAULT 10000)
+RETURNS SETOF UUID
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    RETURN QUERY
+    WITH cte AS (
+        SELECT ctid, master_profile_id
+        FROM cdp_master_profiles
+        WHERE status_code = 10
+        LIMIT batch_size
+        FOR UPDATE
+    ),
+    updated AS (
+        UPDATE cdp_master_profiles p
+        SET status_code = 1
+        FROM cte
+        WHERE p.ctid = cte.ctid
+        RETURNING p.master_profile_id
+    )
+    SELECT master_profile_id FROM updated;
+END;
+$$;

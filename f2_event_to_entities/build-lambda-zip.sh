@@ -7,6 +7,8 @@ echo '📦 Building $ZIP_NAME'
 
 # Step into the dependencies directory and zip contents
 pip freeze > requirements.txt
+
+# Install dependencies
 pip install --upgrade -t dependencies -r requirements.txt
 sleep 1
 cd dependencies || { echo "❌ dependencies/ folder not found!"; exit 1; }

@@ -4,9 +4,9 @@ from http.client import HTTPConnection
 
 # --- HTTP Debugging ---
 HTTPConnection.debuglevel = 1 # Set to 0 once resolved to reduce log verbosity
-logging.basicConfig(level=logging.DEBUG) # Call once, set root logger level
+logging.basicConfig(level=logging.ERROR) # Call once, set root logger level
 requests_log = logging.getLogger("requests.packages.urllib3")
-requests_log.setLevel(logging.DEBUG)
+requests_log.setLevel(logging.ERROR)
 requests_log.propagate = True # Ensure these logs are handled by the root logger's handlers
 
 from locust import HttpUser, task, between
@@ -132,7 +132,7 @@ address_lines = [
 ]
 
  # event sources
-source_systems = ["ecommerce","website","CRM","mobileapp","chatbot"]
+source_systems = ["ecommerce","websdk","CRM","mobileapp","chatbot"]
 
 # Gender-based Vietnamese name generation
 def generate_vietnamese_name(gender: str = None):
@@ -255,7 +255,7 @@ class C360User(HttpUser):
         }
         
         # This log is very helpful.
-        logging.debug("🔄 Payload to be sent:\n" + json.dumps(payload, indent=2, ensure_ascii=False))
+        #logging.debug("🔄 Payload to be sent:\n" + json.dumps(payload, indent=2, ensure_ascii=False))
 
         # Set headers
         headers = {
@@ -272,7 +272,7 @@ class C360User(HttpUser):
             catch_response=True
         ) as response:
             if response.status_code == 200 or response.status_code == 201: # Consider other success codes like 201 (Created)
-                logging.info(f"✅ Success: {response.status_code} - Response text: {response.text[:500]}") # Log part of response text
+                #logging.info(f"✅ Success: {response.status_code} - Response text: {response.text[:500]}") # Log part of response text
                 response.success()
             else:
                 # Log the request body again on failure for easy correlation with the error message
