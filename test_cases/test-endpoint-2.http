@@ -1,6 +1,6 @@
 
 # this is a test 2 in stagging 
-POST https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track HTTP/1.1
+POST https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track HTTP/1.1
 user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
 Content-Type: application/json
 Accept: application/json
