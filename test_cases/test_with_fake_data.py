@@ -28,7 +28,7 @@ def reset_redis_counters():
 
 reset_redis_counters()
 
-CDP_TRACK_URL = 'https://ahri4fkpmd.execute-api.ap-southeast-1.amazonaws.com/dev/c360-profile-track'
+CDP_TRACK_URL = "https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track"
 
 fake = Faker('vi_VN')
 # logging.basicConfig(level=logging.INFO) # Avoid re-calling basicConfig
