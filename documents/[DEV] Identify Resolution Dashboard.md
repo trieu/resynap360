@@ -239,6 +239,32 @@ INNER JOIN
 WHERE cmp.email = 'test_pdebyleq70so@example.com';  
 ```
 
+### **✅ 5. SQL để chạy load test**
+
+```sql
+-- 1: xóa data raw 
+DELETE FROM public.cdp_raw_profiles_stage;
+
+-- 2: xóa links giữa raw và master
+DELETE FROM public.cdp_profile_links;
+
+-- CHAY LOAD TEST --
+
+-- 3: chờ 1 phút và kiểm tra số master profile đã có link
+
+SELECT
+    COUNT(DISTINCT m.master_profile_id)
+FROM
+    public.cdp_master_profiles AS m
+INNER JOIN
+    public.cdp_profile_links AS l 
+    ON m.master_profile_id = l.master_profile_id
+INNER JOIN
+    public.cdp_raw_profiles_stage AS r 
+    ON r.raw_profile_id = l.raw_profile_id
+   AND r.tenant_id = m.tenant_id;
+
+```
 
 ![][image3]
 
