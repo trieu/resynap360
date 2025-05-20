@@ -228,7 +228,7 @@ ORDER BY id DESC LIMIT 100;
 
 Tất cả các raw profile của master profile có email là `test_pdebyleq70so@example.com`.
 
-```sql*  
+```sql  
 SELECT
     crps.*
 FROM
