@@ -107,9 +107,11 @@ class WebEventProcessor:
         """
         Validates that the event body has required fields.
         """
+        metric_len = len(body.get("metric", ""))
         return (
             isinstance(body, dict)
-            and body.get("metric") == "identify"
+            and metric_len > 0 
+            and metric_len < 50 
             and len(body.get("visid", "")) > 0
             and len(body.get("tenant_id", "")) > 0
         )

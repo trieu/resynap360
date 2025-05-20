@@ -14,7 +14,8 @@ DECLARE
     _from_ts TIMESTAMPTZ;
     _to_ts TIMESTAMPTZ;
     _latest_ts TIMESTAMPTZ;
-    _total_processed INTEGER := 0;
+    _log_id BIGINT;
+    _tenant_id TEXT := 'PNJ';  -- default tenant_id, can be parameterized if needed
 BEGIN
     -- Get the latest unlinked and active profile timestamp
     SELECT r.received_at INTO _latest_ts
@@ -26,39 +27,77 @@ BEGIN
 
     RAISE NOTICE 'Latest received_at: %', _latest_ts;
 
+    -- If no unlinked profile found, exit early
+    IF _latest_ts IS NULL THEN
+        RAISE INFO 'No unlinked raw profiles found. Exiting without processing.';
+        RETURN;
+    END IF;
+
     -- Define time window: from (latest - 180m) to (latest + 1m)
     _to_ts := COALESCE(to_datetime, _latest_ts + INTERVAL '1 minute');
     _from_ts := COALESCE(from_datetime, _to_ts - INTERVAL '180 minutes');
 
     RAISE NOTICE 'Processing profiles from % to %', _from_ts, _to_ts;
 
-    LOOP
-        -- Count remaining unprocessed records in the time window
-        SELECT COUNT(*) INTO _unprocessed_count
-        FROM cdp_raw_profiles_stage r
-        LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
-        WHERE l.raw_profile_id IS NULL
-          AND r.status_code = 1
-          AND r.received_at BETWEEN _from_ts AND _to_ts;
+    -- Insert log entry before starting processing
+    INSERT INTO cdp_id_resolution_status (
+        tenant_id, data_from_datetime, data_to_datetime,
+        job_status, job_started_at
+    ) VALUES (
+        _tenant_id, _from_ts, _to_ts,
+        'processing', now()
+    ) RETURNING id INTO _log_id;
 
-        EXIT WHEN _unprocessed_count = 0;
+    BEGIN
+        LOOP
+            -- Count remaining unprocessed records in the time window
+            SELECT COUNT(*) INTO _unprocessed_count
+            FROM cdp_raw_profiles_stage r
+            LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
+            WHERE l.raw_profile_id IS NULL
+              AND r.status_code = 1
+              AND r.received_at BETWEEN _from_ts AND _to_ts;
 
-        _to_process_this_batch := LEAST(_batch_size, _total_max_process - _total_processed);
-        EXIT WHEN _to_process_this_batch <= 0;
+            EXIT WHEN _unprocessed_count = 0;
 
-        BEGIN
-            PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
-            _total_processed := _total_processed + _to_process_this_batch;
+            _to_process_this_batch := LEAST(_batch_size, _total_max_process - _total_processed);
+            EXIT WHEN _to_process_this_batch <= 0;
 
-            RAISE NOTICE 'Processed % profiles (total so far: %)', _to_process_this_batch, _total_processed;
-        EXCEPTION WHEN OTHERS THEN
-            RAISE WARNING 'Error in batch: %, rolling back this batch', SQLERRM;
-        END;
-    END LOOP;
-    -- Final info for pg_cron return_message
-    RAISE INFO 'Total processed: %', _total_processed;
+            BEGIN
+                PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
+                _total_processed := _total_processed + _to_process_this_batch;
+
+                RAISE NOTICE 'Processed % profiles (total so far: %)', _to_process_this_batch, _total_processed;
+            EXCEPTION WHEN OTHERS THEN
+                RAISE WARNING 'Error in batch: %, rolling back this batch', SQLERRM;
+            END;
+        END LOOP;
+
+        -- Final info for pg_cron return_message
+        RAISE INFO 'Total processed: %', _total_processed;
+
+        -- Update job log with success status and total processed count
+        UPDATE cdp_id_resolution_status
+        SET job_status = 'success',
+            processed_count = _total_processed,
+            job_completed_at = now(),
+            updated_at = now()
+        WHERE id = _log_id;
+
+    EXCEPTION WHEN OTHERS THEN
+        -- Update job log on failure with error message
+        UPDATE cdp_id_resolution_status
+        SET job_status = 'failed',
+            error_message = SQLERRM,
+            job_completed_at = now(),
+            updated_at = now()
+        WHERE id = _log_id;
+
+        RAISE;
+    END;
 END;
 $$;
+
 
 
 

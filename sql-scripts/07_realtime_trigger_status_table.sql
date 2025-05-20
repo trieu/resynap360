@@ -16,7 +16,8 @@ CREATE TABLE cdp_id_resolution_status (
     data_to_datetime TIMESTAMP WITH TIME ZONE NOT NULL,
 
     -- Status of the processing job for this specific time range and tenant
-    job_status VARCHAR(12) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'success', 'failed'
+    job_status VARCHAR(12) NOT NULL DEFAULT 'pending', -- valid value: 'pending', 'processing', 'success', 'failed'
+    processed_count INTEGER DEFAULT 0,
 
     job_started_at TIMESTAMP WITH TIME ZONE, -- When a worker claimed this task
     job_completed_at TIMESTAMP WITH TIME ZONE, -- When processing finished

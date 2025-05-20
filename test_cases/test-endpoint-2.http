@@ -1,38 +1,62 @@
 
 # this is a test 2 in stagging 
-POST https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track HTTP/1.1
+POST https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track
 user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
 Content-Type: application/json
 Accept: application/json
 
 {
-    "schema_version": "2025.04.28",
-    "event_id": "5ed708ca-a682-4c26-969b-5c339554b5ea",
-    "tenant_id": "PNJ",
-    "datetime": "2025-05-06T04:00:00Z",
-    "unix_timestamp": 1746529570870,
-    "metric": "identify",
-
-    "mediahost": "www.pnj.com.vn",
-    "tpurl": "https://www.pnj.com.vn/",
-    "profile_traits": 
-    {
-        "phone_number": "840903122291",
-        "first_name": "Trieu",
-        "last_name": "Nguyen",
-        "gender": "male",
-        "date_of_birth": "1986-08-16",
-        "email": "trieu@example.com",
-        "source_system": "ecommerce",
-        "address_line1": "Phu Lam B",
-        "city": "Hochiminh City",
-        "ext_attributes": 
-        {
-            "voucher_code": "FB2025-HELLO",
-            "referrer": "facebook",
-            "store_id": "store_001",
-            "source": "offline_redeem",
-            "loyalty_level": "gold"   
-        }
+  "schema_version": "2025.05.14",
+  "event_id": "5737e8a7-0504-420e-b408-9584492e93f0",
+  "tenant_id": "PNJ",
+  "observer_id": "pnj_game_thantai2025",
+  "metric": "identify",
+  "datetime": "2025-05-20T03:22:40.509Z",
+  "event_date": 20250520,
+  "unix_timestamp": 1747711360,
+  "mediahost": "c360sdk.example.com",
+  "tprefurl": "https://c360sdk.example.com/game-tracking/",
+  "tprefdomain": "c360sdk.example.com",
+  "refhashedphone": "",
+  "refhashedemail": "",
+  "tpurl": "https://c360sdk.example.com/game-tracking/local-test.html",
+  "tpname": "Game Demo - Vòng quay may mắn",
+  "utmdata": {
+    "utmsource": "facebook",
+    "utmmedium": "web",
+    "utmcampaign": "test",
+    "utmterm": "",
+    "utmcontent": ""
+  },
+  "visid": "d9858587-e60e-4067-931a-6a7f385b822e",
+  "refvisid": "",
+  "fgp": "1d7a51e905cf5cdb08cc88c5a28e441f",
+  "sessionid": "ed7cd9a7-1f44-4c2b-a3f7-9ec8bc150b1b",
+  "language": "en-US",
+  "platform": "Linux x86_64",
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+  "app_version": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+  "device": "PC",
+  "open_in_app": "Unknown",
+  "is_in_app_browser": false,
+  "purchase_flow": "",
+  "invoice_number": "",
+  "profile_traits": {
+    "phone_number": "840903122291",
+    "first_name": "Trieu",
+    "last_name": "Nguyen",
+    "gender": "male",
+    "date_of_birth": "1986-08-16",
+    "email": "trieu@example.com",
+    "source_system": "ecommerce",
+    "address_line1": "Phu Lam B",
+    "city": "Hochiminh City",
+    "ext_attributes": {
+      "voucher_code": "FB2025-HELLO",
+      "referrer": "facebook",
+      "store_id": "store_001",
+      "source": "offline_redeem",
+      "loyalty_level": "gold"
     }
+  }
 }
