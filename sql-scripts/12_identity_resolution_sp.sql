@@ -13,7 +13,7 @@ DECLARE
 BEGIN
     IF p_matched_master_id IS NOT NULL THEN
         v_final_master_id := p_matched_master_id;
-        RAISE NOTICE '[LINK_OR_CREATE] Match found for raw_profile_id %: Linking to master_profile_id % (tenant_id: %)', p_raw_profile.raw_profile_id, v_final_master_id, p_raw_profile.tenant_id;
+        -- RAISE NOTICE '[LINK_OR_CREATE] Match found for raw_profile_id %: Linking to master_profile_id % (tenant_id: %)', p_raw_profile.raw_profile_id, v_final_master_id, p_raw_profile.tenant_id;
 
         -- Get current last_seen_at from master to decide on updating related behavioral fields
         SELECT last_seen_at INTO v_master_current_last_seen_at FROM cdp_master_profiles WHERE master_profile_id = v_final_master_id;
@@ -111,10 +111,10 @@ BEGIN
             updated_at = NOW(),
             status_code = 10 
         WHERE mp.master_profile_id = v_final_master_id;
-        RAISE NOTICE '[LINK_OR_CREATE] Updated master_profile_id % with raw_profile_id % data', v_final_master_id, p_raw_profile.raw_profile_id;
+        -- RAISE NOTICE '[LINK_OR_CREATE] Updated master_profile_id % with raw_profile_id % data', v_final_master_id, p_raw_profile.raw_profile_id;
 
     ELSE
-        RAISE NOTICE '[LINK_OR_CREATE] No match found for raw_profile_id % (tenant_id: %): Creating new master profile', p_raw_profile.raw_profile_id, p_raw_profile.tenant_id;
+        -- RAISE NOTICE '[LINK_OR_CREATE] No match found for raw_profile_id % (tenant_id: %): Creating new master profile', p_raw_profile.raw_profile_id, p_raw_profile.tenant_id;
         INSERT INTO cdp_master_profiles (
             master_profile_id, tenant_id,
             email, phone_number, -- primary contacts
@@ -144,14 +144,14 @@ BEGIN
             NOW(), NOW()
         )
         RETURNING master_profile_id INTO v_final_master_id;
-        RAISE NOTICE '[LINK_OR_CREATE] Created new master_profile_id % for raw_profile_id %', v_final_master_id, p_raw_profile.raw_profile_id;
+        -- RAISE NOTICE '[LINK_OR_CREATE] Created new master_profile_id % for raw_profile_id %', v_final_master_id, p_raw_profile.raw_profile_id;
     END IF;
 
     -- Link raw profile to master profile (either existing or new)
     BEGIN
         INSERT INTO cdp_profile_links (raw_profile_id, master_profile_id, match_rule)
         VALUES (p_raw_profile.raw_profile_id, v_final_master_id, p_match_rule);
-        RAISE NOTICE '[LINK_OR_CREATE] Inserted link for raw_profile_id % to master_profile_id % with rule %', p_raw_profile.raw_profile_id, v_final_master_id, p_match_rule;
+        -- RAISE NOTICE '[LINK_OR_CREATE] Inserted link for raw_profile_id % to master_profile_id % with rule %', p_raw_profile.raw_profile_id, v_final_master_id, p_match_rule;
     EXCEPTION
         WHEN unique_violation THEN
             RAISE NOTICE '[LINK_OR_CREATE] Duplicate link skipped: raw_profile_id % already linked to master_profile_id %.', p_raw_profile.raw_profile_id, v_final_master_id;
@@ -177,6 +177,7 @@ CREATE TYPE identity_config_type AS (
 EXCEPTION
     WHEN duplicate_object THEN NULL; -- Skip if TYPE already exists
 END $$;
+
 
 ----------------- resolve_customer_identities_dynamic -----------------------
 -- Main Logic Function (can be run manually)
@@ -229,7 +230,7 @@ BEGIN
         ORDER BY updated_at
         LIMIT batch_size
     LOOP
-        RAISE NOTICE '[RESOLVE_IDENTITIES] Đang xử lý raw_profile_id: % (tenant_id: %)', r_profile.raw_profile_id, r_profile.tenant_id;
+        -- RAISE NOTICE '[RESOLVE_IDENTITIES] Đang xử lý raw_profile_id: % (tenant_id: %)', r_profile.raw_profile_id, r_profile.tenant_id;
 
         matched_master_id := NULL;
         v_where_conditions := '{}';
@@ -321,7 +322,7 @@ BEGIN
                 v_dynamic_select_query
             );
 
-            RAISE NOTICE '[RESOLVE_IDENTITIES] Query động (UNION): %', v_dynamic_select_query;
+            -- RAISE NOTICE '[RESOLVE_IDENTITIES] Query động (UNION): %', v_dynamic_select_query;
 
             BEGIN
                 EXECUTE v_dynamic_select_query INTO matched_master_id;
@@ -339,8 +340,7 @@ BEGIN
             matched_master_id := link_or_create_master_profile(r_profile, NULL, 'NewMaster');
         END IF;
 
-        RAISE NOTICE '[RESOLVE_IDENTITIES] raw_profile_id % được liên kết với master_profile_id: %',
-            r_profile.raw_profile_id, COALESCE(matched_master_id::text, 'KHÔNG CÓ');
+       
 
         -- Bước 7: Cập nhật trạng thái đã xử lý
         UPDATE cdp_raw_profiles_stage

@@ -8,7 +8,7 @@ CREATE TABLE cdp_raw_profiles_stage (
     source_system VARCHAR(100), -- Hệ thống nguồn của bản ghi
     received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-    -- valid value: 3 = processed, 2 = in-progress, 1: is active and unprocessed 
+    -- valid value: 3 = processed, 2 = in-progress, 1: unprocessed 
     --              0: deactivated, -1:  must delete
     status_code SMALLINT DEFAULT 1, 
 
