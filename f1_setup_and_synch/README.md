@@ -1,0 +1,1 @@
+# Customer 360 Synch Config from Admin to PGSQL
