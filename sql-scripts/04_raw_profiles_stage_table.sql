@@ -135,6 +135,16 @@ BEGIN
     END IF;
 END$$;
 
+-- Index cho tenant_id + raw_profile_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_raw_profiles_tenant_id_mpid'
+    ) THEN
+        CREATE INDEX idx_raw_profiles_tenant_id_mpid ON cdp_raw_profiles_stage (tenant_id, raw_profile_id);
+    END IF;
+END$$;
 
 -- Compound index on tenant_id and received_at for processing new data per tenant
 DO $$

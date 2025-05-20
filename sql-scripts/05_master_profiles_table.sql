@@ -167,6 +167,17 @@ BEGIN
     END IF;
 END$$;
 
+-- Index cho tenant_id + master_profile_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public' AND indexname = 'idx_master_profiles_tenant_id_mpid'
+    ) THEN
+        CREATE INDEX idx_master_profiles_tenant_id_mpid ON cdp_master_profiles (tenant_id, master_profile_id);
+    END IF;
+END$$;
+
 -- Index cho tenant_id, email
 DO $$
 BEGIN
