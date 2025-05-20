@@ -239,7 +239,9 @@ INNER JOIN
 WHERE cmp.email = 'test_pdebyleq70so@example.com';  
 ```
 
+
 ![][image3]
+
 
 ---
 
