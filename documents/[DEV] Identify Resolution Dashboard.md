@@ -1,30 +1,5 @@
-# [DEV] Identify Resolution 
 
-##  ***Mục lục***
-
-[Quy trình hợp nhất dữ liệu khách hàng (Customer Identity Resolution)](#quy-trình-hợp-nhất-dữ-liệu-khách-hàng-\(customer-identity-resolution\))
-
-[Kịch bản test: Identity Resolution theo dòng sự kiện](#kịch-bản-test:-identity-resolution-theo-dòng-sự-kiện)
-
-[🎯 Mục tiêu](#🎯-mục-tiêu)
-
-[🧵 1: Web Visitor Gửi Page-View Event](#🧵-1:-web-visitor-gửi-page-view-event)
-
-[🧵 2: Người dùng Login / Submit Form](#🧵-2:-người-dùng-login-/-submit-form)
-
-[🔁 3: Gọi hàm ID Resolution tự động mỗi phút với pg\_cron](#🔁-3:-gọi-hàm-id-resolution-tự-động-mỗi-phút-với-pg_cron)
-
-[Mục đích chính của procedure này là gì?](#mục-đích-chính-của-procedure-này-là-gì?)
-
-[Cách hoạt động của nó:](#cách-hoạt-động-của-nó:)
-
-[✅ 4\. Check kết quả ID Resolution](#✅-4.-check-kết-quả-id-resolution)
-
-[\[DEV\] Identify Resolution Dashboard](#[dev]-identify-resolution-dashboard)
-
-[API to test in staging](#api-to-test-in-staging)
-
-# **Quy trình hợp nhất dữ liệu khách hàng (Customer Identity Resolution)** {#quy-trình-hợp-nhất-dữ-liệu-khách-hàng-(customer-identity-resolution)}
+# **Quy trình hợp nhất dữ liệu khách hàng (Customer Identity Resolution)** 
 
 ## **![][image1]**
 
@@ -43,7 +18,7 @@ Quy trình **hợp nhất dữ liệu khách hàng** (Customer Identity Resoluti
 * **Zalo ID / Facebook ID / Các ID mạng xã hội khác:** Đối với các hệ thống có tích hợp thông tin từ mạng xã hội.  
 * **User ID / Customer ID:** Các mã định danh nội bộ nếu chúng được chia sẻ hoặc có thể được liên kết giữa các hệ thống như SAP ERP, CRM,....
 
-# **Kịch bản test: Identity Resolution theo dòng sự kiện** {#kịch-bản-test:-identity-resolution-theo-dòng-sự-kiện}
+# **Kịch bản test: Identity Resolution theo dòng sự kiện** 
 
 ### **🎯 Mục tiêu** {#🎯-mục-tiêu}
 
@@ -53,25 +28,25 @@ Quy trình **hợp nhất dữ liệu khách hàng** (Customer Identity Resoluti
 
 ---
 
-### **🧵 1: Web Visitor Gửi Page-View Event** {#🧵-1:-web-visitor-gửi-page-view-event}
+### **🧵 1: Web Visitor Gửi Page-View Event** 
 
 **Giả lập event** từ trình duyệt chưa định danh (không có phone/email):
 
 ```json  
 {  
-  "schema\_version": "2025.05.20",  
-  "event\_id": "760a97c8-e4d6-4f64-b539-c06f6f63dbf1",  
-  "tenant\_id": "PNJ",  
-  "observer\_id": "pnj\_game\_thantai2025",  
+  "schema_version": "2025.05.20",  
+  "event_id": "760a97c8-e4d6-4f64-b539-c06f6f63dbf1",  
+  "tenant_id": "PNJ",  
+  "observer_id": "pnj_game_thantai2025",  
   "datetime": "2025-05-20T03:20:00.000Z",  
-  "event\_date": 20250520,  
-  "unix\_timestamp": 1747711200,  
+  "event_date": 20250520,  
+  "unix_timestamp": 1747711200,  
   "metric": "page-view",  
   "mediahost": "c360sdk.example.com",  
   "tpurl": "https://c360sdk.example.com/game-tracking/local-test.html",  
   "tprefurl": "https://c360sdk.example.com/game-tracking/",  
   "tprefdomain": "c360sdk.example.com",  
-  "tpname": "Game Demo \- Vòng quay may mắn",  
+  "tpname": "Game Demo - Vòng quay may mắn",  
   "refhashedphone": null,  
   "refhashedemail": null,  
   "utmdata": {  
@@ -86,17 +61,17 @@ Quy trình **hợp nhất dữ liệu khách hàng** (Customer Identity Resoluti
   "fgp": "1d7a51e905cf5cdb08cc88c5a28e441f",  
   "sessionid": "ed7cd9a7-1f44-4c2b-a3f7-9ec8bc150b1b",  
   "language": "en-US",  
-  "platform": "Linux x86\_64",  
-  "user\_agent": "Mozilla/5.0 (X11; Linux x86\_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
-  "app\_version": "5.0",  
+  "platform": "Linux x86_64",  
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
+  "app_version": "5.0",  
   "device": "PC",  
-  "open\_in\_app": "Unknown",  
-  "is\_in\_app\_browser": false,  
-  "purchase\_flow": null,  
-  "invoice\_number": null,  
-  "event\_payload": {},  
-  "profile\_traits": {  
-    "source\_system": "web\_tracking"  
+  "open_in_app": "Unknown",  
+  "is_in_app_browser": false,  
+  "purchase_flow": null,  
+  "invoice_number": null,  
+  "event_payload": {},  
+  "profile_traits": {  
+    "source_system": "web_tracking"  
   }  
 }  
 ```
@@ -108,25 +83,25 @@ Quy trình **hợp nhất dữ liệu khách hàng** (Customer Identity Resoluti
 
 ---
 
-### **🧵 2: Người dùng Login / Submit Form** {#🧵-2:-người-dùng-login-/-submit-form}
+### **🧵 2: Người dùng Login / Submit Form** 
 
 **Gửi event identify như JSON bạn cung cấp:**
 
 ```json
 {  
-  "schema\_version": "2025.05.20",  
-  "event\_id": "5737e8a7-0504-420e-b408-9584492e93f0",  
-  "tenant\_id": "PNJ",  
-  "observer\_id": "pnj\_game\_thantai2025",  
+  "schema_version": "2025.05.20",  
+  "event_id": "5737e8a7-0504-420e-b408-9584492e93f0",  
+  "tenant_id": "PNJ",  
+  "observer_id": "pnj_game_thantai2025",  
   "datetime": "2025-05-20T03:22:40.509Z",  
-  "event\_date": 20250520,  
-  "unix\_timestamp": 1747711360,  
+  "event_date": 20250520,  
+  "unix_timestamp": 1747711360,  
   "metric": "identify",  
   "mediahost": "c360sdk.example.com",  
   "tpurl": "https://c360sdk.example.com/game-tracking/local-test.html",  
   "tprefurl": "https://c360sdk.example.com/game-tracking/",  
   "tprefdomain": "c360sdk.example.com",  
-  "tpname": "Game Demo \- Vòng quay may mắn",  
+  "tpname": "Game Demo - Vòng quay may mắn",  
   "refhashedphone": "",  
   "refhashedemail": "",  
   "utmdata": {  
@@ -141,31 +116,31 @@ Quy trình **hợp nhất dữ liệu khách hàng** (Customer Identity Resoluti
   "fgp": "1d7a51e905cf5cdb08cc88c5a28e441f",  
   "sessionid": "ed7cd9a7-1f44-4c2b-a3f7-9ec8bc150b1b",  
   "language": "en-US",  
-  "platform": "Linux x86\_64",  
-  "user\_agent": "Mozilla/5.0 (X11; Linux x86\_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
-  "app\_version": "5.0",  
+  "platform": "Linux x86_64",  
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
+  "app_version": "5.0",  
   "device": "PC",  
-  "open\_in\_app": "Unknown",  
-  "is\_in\_app\_browser": false,  
-  "purchase\_flow": null,  
-  "invoice\_number": null,  
-  "event\_payload": {},  
-  "profile\_traits": {  
-    "source\_system": "ecommerce",  
-    "phone\_number": "840903122291",  
-    "first\_name": "Trieu",  
-    "last\_name": "Nguyen",  
+  "open_in_app": "Unknown",  
+  "is_in_app_browser": false,  
+  "purchase_flow": null,  
+  "invoice_number": null,  
+  "event_payload": {},  
+  "profile_traits": {  
+    "source_system": "ecommerce",  
+    "phone_number": "840903122291",  
+    "first_name": "Trieu",  
+    "last_name": "Nguyen",  
     "gender": "male",  
-    "date\_of\_birth": "1986-08-16",  
+    "date_of_birth": "1986-08-16",  
     "email": "trieu@example.com",  
-    "address\_line1": "Phu Lam B",  
+    "address_line1": "Phu Lam B",  
     "city": "Hochiminh City",  
-    "ext\_attributes": {  
-      "voucher\_code": "FB2025-HELLO",  
+    "ext_attributes": {  
+      "voucher_code": "FB2025-HELLO",  
       "referrer": "facebook",  
-      "store\_id": "store\_001",  
-      "source": "offline\_redeem",  
-      "loyalty\_level": "gold"  
+      "store_id": "store_001",  
+      "source": "offline_redeem",  
+      "loyalty_level": "gold"  
     }  
   }  
 }  
@@ -178,26 +153,27 @@ Quy trình **hợp nhất dữ liệu khách hàng** (Customer Identity Resoluti
 
 ---
 
-### **🔁 3: Gọi hàm ID Resolution tự động mỗi phút với pg\_cron** {#🔁-3:-gọi-hàm-id-resolution-tự-động-mỗi-phút-với-pg_cron}
+### **🔁 3: Gọi hàm ID Resolution tự động mỗi phút với pg_cron** 
 
-Mặc định lấy data 3 giờ gần nhất với batch size \= 5000
+Mặc định lấy data 3 giờ gần nhất với batch size = 5000
 
-``sql   
-**CALL process\_new\_raw\_profiles();**  
+```sql   
+CALL process_new_raw_profiles();
 ```
 
-Để chạy thủ tục process\_new\_raw\_profiles với khoảng thời gian từ 10:00 đến 11:00 sáng (giờ VN) ngày 20/5/2025, bạn gọi nó như sau:  
+
+Để chạy thủ tục process_new_raw_profiles với khoảng thời gian từ 10:00 đến 11:00 sáng (giờ VN) ngày 20/5/2025, bạn gọi nó như sau:  
 	  
 ```sql
-**CALL process\_new\_raw\_profiles(**  
-   **'2025-05-20 10:00:00+07'::timestamptz,**  
-   **'2025-05-20 11:00:00+07'::timestamptz**  
-**);**  
+CALL process_new_raw_profiles(
+    '2025-05-20 10:00:00+07'::timestamptz,
+    '2025-05-20 11:00:00+07'::timestamptz
+);
 ```
 
 ---
 
-#### ***Mục đích chính của procedure này là gì?*** {#mục-đích-chính-của-procedure-này-là-gì?}
+#### ***Mục đích chính của procedure này là gì?*** 
 
 * **Xử lý (process) dữ liệu mới từ bảng `cdp_raw_profiles_stage`**: những profile thô chưa được liên kết (unlinked) và có trạng thái `status_code = 1`.  
 * Xử lý theo từng đợt (batch), giới hạn số lượng bản ghi xử lý trong một lần chạy.  
@@ -205,7 +181,7 @@ Mặc định lấy data 3 giờ gần nhất với batch size \= 5000
 
 ---
 
-#### ***Cách hoạt động của nó:*** {#cách-hoạt-động-của-nó:}
+#### ***Cách hoạt động của nó:*** 
 
 1. **Lấy thời điểm mới nhất có profile thô chưa được liên kết (chưa xử lý):**  
    * Procedure truy vấn để lấy thời gian `received_at` mới nhất của những profile thỏa điều kiện chưa liên kết (`raw_profile_id` chưa có trong bảng `cdp_profile_links`) và có trạng thái `status_code = 1`.  
@@ -238,9 +214,9 @@ Mặc định lấy data 3 giờ gần nhất với batch size \= 5000
 
 ---
 
-### **✅ 4\. Check kết quả ID Resolution** {#✅-4.-check-kết-quả-id-resolution}
+### **✅ 4. Check kết quả ID Resolution**
 
-– SQL xem kết quả id\_resolution\_
+SQL xem kết quả các jobs đang xử lý ID Resolution
 
 ```sql  
 SELECT *
@@ -250,9 +226,9 @@ ORDER BY id DESC LIMIT 100;
 
 ![][image2]
 
-***– All raw profiles of master\_profile with email \= '[test\_pdebyleq70so@example.com](mailto:test_pdebyleq70so@example.com)'***
+Tất cả các raw profile của master profile có email là `test_pdebyleq70so@example.com`.
 
-*```sql*  
+```sql*  
 SELECT
     crps.*
 FROM
@@ -261,46 +237,46 @@ INNER JOIN
     public.cdp_master_profiles AS cmp ON crps.tenant_id = cmp.tenant_id
                                        AND crps.web_visitor_id = ANY(cmp.web_visitor_ids)
 WHERE cmp.email = 'test_pdebyleq70so@example.com';  
-*```*
+```
 
 ![][image3]
 
 ---
 
-# **\[DEV\] Identify Resolution Dashboard** {#[dev]-identify-resolution-dashboard}
+# **[DEV] Identify Resolution Dashboard** 
 
 URL: [https://ss.pnj.io/superset/dashboard/dev-identity-resolution/](https://ss.pnj.io/superset/dashboard/dev-identity-resolution/)
 
-* username: analytics\_viewer  
-* password: CafeKhong\~12022025
+* username: analytics_viewer  
+* password: CafeKhong~12022025
 
 ![][image4]
 
-# **API to test in staging**  {#api-to-test-in-staging}
+# **API to test in staging**  
 
 POST ***https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track*** 
 
-user-agent: Mozilla/5.0 (X11; Linux x86\_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36  
+user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36  
 Content-Type: application/json  
 Accept: application/json
 
 ```json  
 {  
-  "schema\_version": "2025.05.14",  
-  "event\_id": "5737e8a7-0504-420e-b408-9584492e93f0",  
-  "tenant\_id": "PNJ",  
-  "observer\_id": "pnj\_game\_thantai2025",  
+  "schema_version": "2025.05.14",  
+  "event_id": "5737e8a7-0504-420e-b408-9584492e93f0",  
+  "tenant_id": "PNJ",  
+  "observer_id": "pnj_game_thantai2025",  
   "metric": "identify",  
   "datetime": "2025-05-20T03:22:40.509Z",  
-  "event\_date": 20250520,  
-  "unix\_timestamp": 1747711360,  
+  "event_date": 20250520,  
+  "unix_timestamp": 1747711360,  
   "mediahost": "c360sdk.example.com",  
   "tprefurl": "https://c360sdk.example.com/game-tracking/",  
   "tprefdomain": "c360sdk.example.com",  
   "refhashedphone": "",  
   "refhashedemail": "",  
   "tpurl": "https://c360sdk.example.com/game-tracking/local-test.html",  
-  "tpname": "Game Demo \- Vòng quay may mắn",  
+  "tpname": "Game Demo - Vòng quay may mắn",  
   "utmdata": {  
     "utmsource": "facebook",  
     "utmmedium": "web",  
@@ -313,30 +289,30 @@ Accept: application/json
   "fgp": "1d7a51e905cf5cdb08cc88c5a28e441f",  
   "sessionid": "ed7cd9a7-1f44-4c2b-a3f7-9ec8bc150b1b",  
   "language": "en-US",  
-  "platform": "Linux x86\_64",  
-  "user\_agent": "Mozilla/5.0 (X11; Linux x86\_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
-  "app\_version": "5.0 (X11; Linux x86\_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
+  "platform": "Linux x86_64",  
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
+  "app_version": "5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",  
   "device": "PC",  
-  "open\_in\_app": "Unknown",  
-  "is\_in\_app\_browser": false,  
-  "purchase\_flow": "",  
-  "invoice\_number": "",  
-  "profile\_traits": {  
-    "phone\_number": "840903122291",  
-    "first\_name": "Trieu",  
-    "last\_name": "Nguyen",  
+  "open_in_app": "Unknown",  
+  "is_in_app_browser": false,  
+  "purchase_flow": "",  
+  "invoice_number": "",  
+  "profile_traits": {  
+    "phone_number": "840903122291",  
+    "first_name": "Trieu",  
+    "last_name": "Nguyen",  
     "gender": "male",  
-    "date\_of\_birth": "1986-08-16",  
+    "date_of_birth": "1986-08-16",  
     "email": "trieu@example.com",  
-    "source\_system": "ecommerce",  
-    "address\_line1": "Phu Lam B",  
+    "source_system": "ecommerce",  
+    "address_line1": "Phu Lam B",  
     "city": "Hochiminh City",  
-    "ext\_attributes": {  
-      "voucher\_code": "FB2025-HELLO",  
+    "ext_attributes": {  
+      "voucher_code": "FB2025-HELLO",  
       "referrer": "facebook",  
-      "store\_id": "store\_001",  
-      "source": "offline\_redeem",  
-      "loyalty\_level": "gold"  
+      "store_id": "store_001",  
+      "source": "offline_redeem",  
+      "loyalty_level": "gold"  
     }  
   }  
 }  
