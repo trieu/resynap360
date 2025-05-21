@@ -84,3 +84,10 @@ INNER JOIN
     public.cdp_raw_profiles_stage AS r 
     ON r.raw_profile_id = l.raw_profile_id
    AND r.tenant_id = m.tenant_id;
+
+CALL process_new_raw_profiles(
+    from_datetime := NOW() - INTERVAL '180 seconds',
+    to_datetime := NOW()
+);
+
+-- in 5 minutes, total processed records = 337317 - 221382. 1 minute =  23,187 records

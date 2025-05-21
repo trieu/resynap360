@@ -29,8 +29,16 @@ CREATE TABLE cdp_id_resolution_status (
 
 -- Add a unique constraint if the combination of tenant, from, and to should be unique
 -- This prevents the same task (for the same tenant and time range) from being queued multiple times.
-ALTER TABLE cdp_id_resolution_status
-ADD CONSTRAINT uq_cdp_id_resolution_status_tenant_range UNIQUE (tenant_id, data_from_datetime, data_to_datetime);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_resolution_job
+ON cdp_id_resolution_status (tenant_id, data_from_datetime, data_to_datetime)
+WHERE job_status IN ('success', 'processing');
+
+
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_resolution_job
+ON cdp_id_resolution_status (tenant_id, data_from_datetime, data_to_datetime)
+WHERE job_status IN ('success', 'processing');
+
 
 -- Add indexes for efficient querying of pending tasks and by tenant
 -- The primary key 'id' is automatically indexed.

@@ -203,6 +203,7 @@ BEGIN
     RAISE NOTICE '[RESOLVE_IDENTITIES] Bắt đầu xử lý với batch_size % tại thời điểm %', batch_size, v_start_time;
 
     -- Bước 1: Đánh dấu trước batch
+    -- Use FOR UPDATE SKIP LOCKED to avoid locking conflicts and deadlocks between concurrent workers
     WITH picked_rows AS (
         SELECT raw_profile_id
         FROM cdp_raw_profiles_stage
@@ -213,7 +214,7 @@ BEGIN
           AND (from_ts IS NULL OR received_at >= from_ts)
           AND (to_ts IS NULL OR received_at <= to_ts)
         LIMIT batch_size
-        FOR UPDATE
+        FOR UPDATE SKIP LOCKED
     )
     UPDATE cdp_raw_profiles_stage r
     SET status_code = 2,
@@ -278,7 +279,7 @@ BEGIN
             ) THEN
                 v_master_col_name := v_identity_config_rec.attr_code;
 
-                -- Matching Rule
+                -- Compose matching condition based on the matching rule
                 CASE v_identity_config_rec.match_rule
                     WHEN 'exact' THEN
                         v_condition_text := format('mp.%I = %L', v_master_col_name, v_raw_value_text);
