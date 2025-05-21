@@ -27,6 +27,16 @@ start_workers() {
   done
 }
 
+start_single_node() {
+  pkill -f "locust"
+  sleep 1
+  echo "Starting Locust in single-node mode..."
+  nohup locust -f $TESTCASE \
+    --host=$HOST \
+    --loglevel=INFO > logs/locust_single_node.log 2>&1 &
+  echo "Locust single-node started with PID $!"
+}
+
 stop_locust() {
   echo "Stopping all Locust processes..."
   pkill -f "locust"
@@ -39,11 +49,14 @@ case "$1" in
     start_master
     start_workers
     ;;
+  start_single)
+    mkdir -p logs
+    start_single_node
+    ;;
   stop)
     stop_locust
     ;;
   *)
-    echo "Usage: $0 {start|stop}"
+    echo "Usage: $0 {start|start_single|stop}"
     ;;
 esac
-

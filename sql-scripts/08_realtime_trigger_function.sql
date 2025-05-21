@@ -15,9 +15,9 @@ DECLARE
     _to_ts TIMESTAMPTZ;
     _latest_ts TIMESTAMPTZ;
     _log_id BIGINT;
-    _tenant_id TEXT := 'PNJ';  -- default tenant_id, can be parameterized if needed
+    _tenant_id TEXT := 'PNJ'; -- default tenant_id, can be parameterized if needed
 BEGIN
-    -- Get the latest unlinked and active profile timestamp
+    -- find the latest timestamp
     SELECT r.received_at INTO _latest_ts
     FROM cdp_raw_profiles_stage r
     LEFT JOIN cdp_profile_links l ON r.raw_profile_id = l.raw_profile_id
@@ -25,13 +25,12 @@ BEGIN
     ORDER BY r.received_at DESC
     LIMIT 1;
 
-    RAISE NOTICE 'Latest received_at: %', _latest_ts;
-
-    -- If no unlinked profile found, exit early
     IF _latest_ts IS NULL THEN
         RAISE INFO 'No unlinked raw profiles found. Exiting without processing.';
         RETURN;
     END IF;
+    
+    RAISE NOTICE 'Latest received_at: %', _latest_ts;
 
     -- Define time window: from (latest - 180m) to (latest + 1m)
     _to_ts := COALESCE(to_datetime, _latest_ts + INTERVAL '1 minute');
@@ -64,6 +63,7 @@ BEGIN
             EXIT WHEN _to_process_this_batch <= 0;
 
             BEGIN
+                -- call function for entity resolution
                 PERFORM resolve_customer_identities_dynamic(_to_process_this_batch, _from_ts, _to_ts);
                 _total_processed := _total_processed + _to_process_this_batch;
 
@@ -92,11 +92,11 @@ BEGIN
             job_completed_at = now(),
             updated_at = now()
         WHERE id = _log_id;
-
         RAISE;
     END;
 END;
 $$;
+
 
 
 
