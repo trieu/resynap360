@@ -182,52 +182,6 @@ def validate_phone_number(phone_number_str):
         return False
 
 
-def get_db_credentials(secret_name, region_name):
-    """Retrieve database credentials from AWS Secrets Manager."""
-    if not secret_name or not region_name:
-        raise ValueError("Secret name and region name must be provided.")
-
-    session = boto3.session.Session()
-    client = session.client(
-        service_name='secretsmanager', region_name=region_name)
-    try:
-        get_secret_value_response = client.get_secret_value(
-            SecretId=secret_name)
-        # Decrypts secret using the associated KMS key.
-        # Depending on whether the secret is a string or binary
-        if 'SecretString' in get_secret_value_response:
-            secret = get_secret_value_response['SecretString']
-        else:
-            # Binary secrets need to be base64 decoded
-            secret = base64.b64decode(
-                get_secret_value_response['SecretBinary'])
-
-        return json.loads(secret)
-    except ClientError as e:
-        # More specific error handling for ClientError
-        if e.response['Error']['Code'] == 'DecryptionFailureException':
-            # Secrets Manager can't decrypt the protected secret text using the provided KMS key.
-            raise Exception("Secrets Manager Decryption Failure: " + str(e))
-        elif e.response['Error']['Code'] == 'InternalServiceErrorException':
-            # An error occurred on the server side.
-            raise Exception("Secrets Manager Internal Service Error: " + str(e))
-        elif e.response['Error']['Code'] == 'InvalidParameterException':
-            # You provided an invalid value for a parameter.
-            raise Exception("Secrets Manager Invalid Parameter: " + str(e))
-        elif e.response['Error']['Code'] == 'InvalidRequestException':
-            # You provided a parameter value that is not valid for the current state of the resource.
-            raise Exception("Secrets Manager Invalid Request: " + str(e))
-        elif e.response['Error']['Code'] == 'ResourceNotFoundException':
-            # We can't find the resource that you asked for.
-            raise Exception(f"Secrets Manager Secret not found: {secret_name}")
-        else:
-            # Catch any other ClientError
-            raise Exception("Secrets Manager Client Error: " + str(e))
-    except Exception as e:
-        # Catch any other exceptions
-        raise Exception(
-            f"An unexpected error occurred retrieving secret: {str(e)}")
-
 
 ################# SQL to upsert profile #################
 

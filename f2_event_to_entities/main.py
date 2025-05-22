@@ -5,16 +5,32 @@ import psycopg2
 import socket
 from processor import convert_event_to_profile, save_to_postgresql
 
-# --- Configuration from environment variables ---
-DB_HOST = os.environ.get("DB_HOST")
-DB_NAME = os.environ.get("DB_NAME")
-DB_USER = os.environ.get("DB_USER")
-DB_PASS = os.environ.get("DB_PASS")
-DB_PORT = int(os.environ.get("DB_PORT", "5432"))
-DB_BATCH_SIZE = int(os.environ.get("DB_BATCH_SIZE", "150"))   
+
+# --- load db_credentials ---
+import db_utils
+db_credentials = db_utils.get_db_credentials()
+DB_HOST = db_credentials.get("DB_HOST")
+DB_NAME = db_credentials.get("DB_NAME")
+DB_USER = db_credentials.get("DB_USER")
+DB_PASS = db_credentials.get("DB_PASS")
+DB_PORT = int(db_credentials.get("DB_PORT", "5432"))
+
+# batch size to commit
+C360_RAW_PROFILE_BATCH_SIZE = int(os.environ.get("C360_RAW_PROFILE_BATCH_SIZE", "150"))   
 
 def lambda_handler(event, context):
     print("🔥 [START] Lambda triggered. Using version 2025.05.15 10h")
+    
+    # --- Validate Configuration ---
+    missing_env = [var for var in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASS"] if not db_credentials.get(var)]
+    if missing_env:
+        print(f"[CONFIG ERROR] Missing environment variables: {missing_env}")
+        return {
+            "records": [
+                {"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']}
+                for r in records
+            ]
+        }
 
     records = event.get("records", [])
     output = []
@@ -47,16 +63,6 @@ def lambda_handler(event, context):
             ]
         }
 
-    # --- Validate Configuration ---
-    missing_env = [var for var in ["DB_HOST", "DB_NAME", "DB_USER", "DB_PASS"] if not os.environ.get(var)]
-    if missing_env:
-        print(f"[CONFIG ERROR] Missing environment variables: {missing_env}")
-        return {
-            "records": [
-                {"recordId": r['recordId'], "result": "ProcessingFailed", "data": r['data']}
-                for r in records
-            ]
-        }
 
     # --- Process Each Record ---
     valid_profiles = []
@@ -71,7 +77,7 @@ def lambda_handler(event, context):
             
             # only save valid profiles
             valid_profiles.append(profile) 
-            if len(valid_profiles) >= DB_BATCH_SIZE:
+            if len(valid_profiles) >= C360_RAW_PROFILE_BATCH_SIZE:
                  # --- Save batch to PostgreSQL ---
                 save_to_postgresql(valid_profiles, db_connection)
                 # reset batch 

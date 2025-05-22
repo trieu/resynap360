@@ -3,7 +3,6 @@ import boto3
 import os
 import redis
 
-
 class EventQueue:
     """
     Abstracts the event queue implementation. Supports Firehose or Redis Pub/Sub
@@ -35,7 +34,6 @@ class EventQueue:
                 DeliveryStreamName=self.stream_name,
                 Record={"Data": data}
             )
-
         elif self.queue_type == "redis":
             data = json.dumps(event)
             result = self.client.publish(self.channel, data)
@@ -68,7 +66,6 @@ class WebEventProcessor:
                 # Send to event queue
                 queue_response = self._send_to_event_queue(body)
                 print("Queue response:", queue_response)
-
                 persona_profiles = self._get_persona_profiles(visid)
 
                 return self._build_response(200, {
@@ -135,6 +132,8 @@ class WebEventProcessor:
         return {
             "statusCode": status_code,
             "headers": {
+                "Content-Type": "application/json",
+                "Referrer-Policy": "strict-origin-when-cross-origin",
                 "Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
                 "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
                 "Access-Control-Allow-Origin": "*"

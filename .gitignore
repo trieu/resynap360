@@ -13,6 +13,7 @@ env
 
 *.cdp_dev
 *.Mycatisfat!~3775
+*.zip
 
 # Compiled Java class files
 *.class
