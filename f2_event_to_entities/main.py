@@ -33,7 +33,6 @@ def lambda_handler(event, context):
         }
 
     records = event.get("records", [])
-    output = []
     db_connection = None
     
     # --- Check Reachability & Connect ---
@@ -66,6 +65,7 @@ def lambda_handler(event, context):
 
     # --- Process Each Record ---
     valid_profiles = []
+    output = []
     for record in records:
         record_id = record.get("recordId", "N/A")
         record_data = record.get("data", "") 
@@ -83,16 +83,18 @@ def lambda_handler(event, context):
                 # reset batch 
                 valid_profiles = []
              
+            # "Ok" (processed successfully)
             output.append({
                 "recordId": record_id,
                 "result": "Ok",
-                "web_visitor_id": profile["web_visitor_id"]
+                "data": record["data"]
             })
         except Exception as e:
             print(f"[ERROR] Record ID {record_id} failed: {str(e)}")
+            # "Dropped" (discard this record)
             output.append({
                 "recordId": record_id,
-                "result": "ProcessingFailed",
+                "result": "Dropped",
                 "data": record["data"]
             })
 
