@@ -102,15 +102,28 @@ class WebEventProcessor:
 
     def _is_valid_event(self, body):
         """
-        Validates that the event body has required fields.
+        Validates an incoming event payload.
+
+        This method ensures the payload is a dictionary and meets several criteria:
+        - The 'metric' field must be a string between 1 and 49 characters long.
+        - The 'visid' (visitor ID) field must be a string between 1 and 36  characters long.
+        - The 'tenant_id' field must be a string between 1 and 36 characters long.
+
+        Args:
+            body (dict): The event payload to validate.
+
+        Returns:
+            bool: True if the event is valid, False otherwise.
         """
         metric_len = len(body.get("metric", ""))
+        visid_len = len(body.get("visid", ""))
+        tenant_id_len = len(body.get("tenant_id", ""))
+
         return (
             isinstance(body, dict)
-            and metric_len > 0 
-            and metric_len < 50 
-            and len(body.get("visid", "")) > 0
-            and len(body.get("tenant_id", "")) > 0
+            and (0 < metric_len < 50)
+            and (1 <= visid_len <= 36)
+            and (1 <= tenant_id_len <= 36)
         )
 
     def _send_to_event_queue(self, body):
