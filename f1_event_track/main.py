@@ -1,7 +1,45 @@
 import json
 import boto3
 import os
-import redis
+from littletable import Table
+from datetime import datetime, timedelta
+import psycopg2
+
+
+# Create the in-memory profile cache
+persona_profiles_cache = Table()
+persona_profiles_cache.create_index("key")
+
+
+def load_recent_profiles_from_pgsql():
+    """
+    Load profiles updated in the last 7 days from PostgreSQL
+    """
+    cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+    
+    conn = psycopg2.connect(
+        dbname=os.environ["PGDATABASE"],
+        user=os.environ["PGUSER"],
+        password=os.environ["PGPASSWORD"],
+        host=os.environ["PGHOST"],
+        port=os.environ.get("PGPORT", 5432),
+    )
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT tenant_id, visitor_id, persona_profiles
+        FROM cdp_persona_profiles
+        WHERE updated_at >= %s
+    """, (cutoff,))
+    
+    rows = cur.fetchall()
+    persona_profiles_cache.clear()
+    for tenant_id, visitor_id, profiles in rows:
+        key = f"{tenant_id}:{visitor_id}"
+        persona_profiles_cache.insert({"key": key, "persona_profiles": profiles})
+    
+    print(f"✅ Loaded {len(rows)} persona profiles into cache")
+    cur.close()
+    conn.close()
 
 
 class EventQueue:
@@ -13,10 +51,7 @@ class EventQueue:
             self.client = boto3.client('firehose')
 
         elif self.queue_type == "redis":
-            redis_host = os.environ.get("REDIS_HOST", "localhost")
-            redis_port = int(os.environ.get("REDIS_PORT", 6379))
-            self.channel = os.environ.get("REDIS_CHANNEL", "pnj_web_events")
-            self.client = redis.StrictRedis(host=redis_host, port=redis_port, decode_responses=True)
+            raise ValueError("Redis is no longer supported. Use LittleTable in-memory cache.")
 
         else:
             raise ValueError(f"Unsupported QUEUE_TYPE: {self.queue_type}")
@@ -28,10 +63,6 @@ class EventQueue:
                 DeliveryStreamName=self.stream_name,
                 Record={"Data": data}
             )
-        elif self.queue_type == "redis":
-            data = json.dumps(event)
-            result = self.client.publish(self.channel, data)
-            return {"result": result, "backend": "redis"}
         else:
             raise RuntimeError("Invalid event queue configuration")
 
@@ -39,13 +70,6 @@ class EventQueue:
 class WebEventProcessor:
     def __init__(self, event_queue: EventQueue = None):
         self.event_queue = event_queue or EventQueue()
-
-        # Initialize Redis for persona_profiles
-        redis_host = os.environ.get("REDIS_HOST", "localhost")
-        redis_port = int(os.environ.get("REDIS_PORT", 6379))
-        self.redis_client = redis.StrictRedis(
-            host=redis_host, port=redis_port, decode_responses=True
-        )
 
     def handle_event(self, event):
         print("Event received:", event)
@@ -60,8 +84,8 @@ class WebEventProcessor:
                 queue_response = self._send_to_event_queue(body)
                 print("Queue response:", queue_response)
 
-                # Fetch persona profiles
-                persona_profiles = self._get_persona_profiles(visid)
+                # Fetch persona profiles using in-memory cache
+                persona_profiles = self._get_persona_profiles(tenant_id, visid)
 
                 return self._build_response(200, {
                     "success": True,
@@ -106,16 +130,19 @@ class WebEventProcessor:
     def _send_to_event_queue(self, body):
         return self.event_queue.send(body)
 
-    def _get_persona_profiles(self, visitor_id):
+    def _get_persona_profiles(self, tenant_id, visitor_id):
+        """
+        Lookup persona_profiles from in-memory cache (LittleTable)
+        """
         try:
-            redis_key = f"persona_profiles:{visitor_id}"
-            result = self.redis_client.get(redis_key)
-            if result:
-                return json.loads(result)
+            key = f"{tenant_id}:{visitor_id}"
+            row = persona_profiles_cache.find_one(key=key)
+            if row:
+                return json.loads(row["persona_profiles"])
             else:
                 return ["persona_web_visitor"]
         except Exception as e:
-            print(f"Redis error while fetching persona_profiles for {visitor_id}: {str(e)}")
+            print(f"LittleTable error while fetching persona_profiles for {key}: {str(e)}")
             return ["persona_web_visitor"]
 
     def _build_response(self, status_code, body):
@@ -133,5 +160,8 @@ class WebEventProcessor:
 
 
 def lambda_handler(event, context):
+    # For AWS Lambda with SnapStart: preload cache once
+    if persona_profiles_cache.size() == 0:
+        load_recent_profiles_from_pgsql()
     processor = WebEventProcessor()
     return processor.handle_event(event)
