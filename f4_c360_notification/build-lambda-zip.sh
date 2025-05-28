@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Name of the final zip file
-ZIP_NAME="f3_c360_notify_results.zip"
+ZIP_NAME="f4_c360_notification.zip"
 
 echo '📦 Building $ZIP_NAME'
 

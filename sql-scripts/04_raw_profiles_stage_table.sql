@@ -52,7 +52,8 @@ CREATE TABLE cdp_raw_profiles_stage (
     ext_attributes JSONB,
 
     -- thời gian cuối cùng mà profile đã được xử lý
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() 
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    persona_tags TEXT[], -- e.g., ['history_lover', 'luxury_traveler']
 );
 
 

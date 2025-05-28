@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Name of the final zip file
-ZIP_NAME="f0_event_track.zip"
+ZIP_NAME="f1_event_track.zip"
 
 echo '📦 Building $ZIP_NAME'
 
