@@ -2,7 +2,7 @@
 
 # === CONFIG ===
 TESTCASE="test_cases/test_with_fake_data.py"
-HOST="https://cdp-api.stage.pnj.io"
+HOST="https://cdp-api.resynap.com"
 MASTER_HOST="127.0.0.1"
 WORKER_COUNT=3
 

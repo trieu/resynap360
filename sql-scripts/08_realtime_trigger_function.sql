@@ -15,7 +15,7 @@ DECLARE
     _to_ts TIMESTAMPTZ;
     _latest_ts TIMESTAMPTZ;
     _log_id BIGINT;
-    _tenant_id TEXT := 'PNJ'; -- default tenant_id, can be parameterized if needed
+    _tenant_id TEXT := 'demo'; -- default tenant_id, can be parameterized if needed
     _existing_status TEXT;
 BEGIN
     -- Determine time range first

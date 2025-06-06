@@ -1,6 +1,6 @@
 
 # this is a test 2 in stagging 
-POST https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track/
+POST https://cdp-api.resynap.com/id-resolution/c360-profile-track/
 user-agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36
 Content-Type: application/json
 Accept: application/json
@@ -8,8 +8,8 @@ Accept: application/json
 {
   "schema_version": "2025.05.14",
   "event_id": "5737e8a7-0504-420e-b408-9584492e93f0",
-  "tenant_id": "PNJ",
-  "observer_id": "pnj_game_thantai2025",
+  "tenant_id": "demo",
+  "observer_id": "demo_game_thantai2025",
   "metric": "identify",
   "datetime": "2025-05-20T03:22:40.509Z",
   "event_date": 20250520,

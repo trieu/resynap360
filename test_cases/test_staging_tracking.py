@@ -1,18 +1,18 @@
 import requests
 import json
 
-url = "https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track"
+url = "https://cdp-api.resynap.com/id-resolution/c360-profile-track"
 
 payload = {
     "schema_version": "2025.04.28",
     "event_id": "5ed708ca-a682-4c26-969b-5c339554b5ea",
-    "tenant_id": "PNJ",
+    "tenant_id": "demo",
     "datetime": "2025-05-06T04:00:00Z",
     "unix_timestamp": 1746529570870,
     "metric": "identify",
     "visid": "9b02723f-2dcb-440b-8498-532331d76e9e",
-    "mediahost": "www.pnj.com.vn",
-    "tpurl": "https://www.pnj.com.vn/",
+    "mediahost": "elearning.resynap.com",
+    "tpurl": "https://elearning.resynap.com/",
     "profile_traits": {
         "phone_number": "860000316623",
         "first_name": "Thomas",

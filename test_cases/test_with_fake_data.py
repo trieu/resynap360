@@ -28,7 +28,7 @@ def reset_redis_counters():
 
 reset_redis_counters()
 
-CDP_TRACK_URL = "https://cdp-api.stage.pnj.io/id-resolution/c360-profile-track"
+CDP_TRACK_URL = "https://cdp-api.resynap.com/id-resolution/c360-profile-track"
 
 fake = Faker('vi_VN')
 # logging.basicConfig(level=logging.INFO) # Avoid re-calling basicConfig
@@ -224,13 +224,13 @@ class C360User(HttpUser):
         payload = {
             "schema_version": "2025.04.28", 
             "event_id": str(uuid.uuid4()),
-            "tenant_id": "PNJ",
+            "tenant_id": "demo",
             "datetime": formatted_datetime_utc,
             "unix_timestamp": unix_ts, 
             "metric": EVENT_NAME,
             "visid": visitor_id,
-            "mediahost": "www.pnj.com.vn",
-            "tpurl": "https://www.pnj.com.vn/",
+            "mediahost": "elearning.resynap.com",
+            "tpurl": "https://elearning.resynap.com/",
             "profile_traits": {
                 "phone_number": phone_number,
                 "first_name": first_name,
