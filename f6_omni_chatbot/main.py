@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from redis import Redis
 from pathlib import Path
 import json
-
+import time
 
 from mangum import Mangum
 from google import genai
@@ -18,6 +18,8 @@ from google.genai import types
 
 import os
 from dotenv import load_dotenv
+
+from chatbot_models import Message
 
 # Load environment variables
 LOCAL_ENV_FILE = "./f6_omni_chatbot/.local_env"
@@ -34,6 +36,7 @@ LEOBOT_DEV_MODE = os.getenv("LEOBOT_DEV_MODE") == "true"
 HOSTNAME = os.getenv("HOSTNAME")
 REDIS_USER_SESSION_HOST = os.getenv("REDIS_USER_SESSION_HOST")
 REDIS_USER_SESSION_PORT = os.getenv("REDIS_USER_SESSION_PORT")
+REDIS_USER_SESSION_DB = os.getenv("REDIS_USER_SESSION_DB")
 GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY")
 
 
@@ -43,10 +46,20 @@ print("HOSTNAME " + HOSTNAME)
 print("LEOBOT_DEV_MODE " + str(LEOBOT_DEV_MODE))
 
 # Redis Client to get User Session
-REDIS_CLIENT = Redis(host=REDIS_USER_SESSION_HOST,  port=REDIS_USER_SESSION_PORT, decode_responses=True)
+REDIS_CLIENT = Redis(host=REDIS_USER_SESSION_HOST,  port=REDIS_USER_SESSION_PORT, db=REDIS_USER_SESSION_DB, decode_responses=True)
+
 FOLDER_RESOURCES = os.path.dirname(os.path.abspath(__file__)) + "/resources/"
 FOLDER_TEMPLATES = FOLDER_RESOURCES + "templates"
 
+def is_running_in_aws_lambda() -> bool:
+    """
+    Checks if the code is running in the AWS Lambda environment.
+
+    Returns:
+        True if running in Lambda, False otherwise.
+    """
+    # AWS sets this environment variable in the Lambda execution environment.
+    return "AWS_LAMBDA_FUNCTION_NAME" in os.environ
 
 # init FAST API leobot
 leobot = FastAPI()
@@ -74,18 +87,67 @@ async def is_leobot_ready():
     return {"ok": isReady}
 
 
-@leobot.get("/")
-async def root():
-    return {"message": "Hello from LEO BOT!"}
+@leobot.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    ts = int(time.time())
+    data = {"request": request, "HOSTNAME": HOSTNAME, "LEOBOT_DEV_MODE": LEOBOT_DEV_MODE, 'timestamp': ts}
+    return templates.TemplateResponse("chatbot.html", data)
+
+
+@leobot.get("/get-visitor-info", response_class=JSONResponse)
+async def get_visitor_info(visitor_id: str):
+    isReady = isinstance(GOOGLE_GENAI_API_KEY, str)
+    if not isReady:        
+        return {"answer": "GOOGLE_GENAI_API_KEY is empty", "error_code": 501}
+    if len(visitor_id) == 0: 
+        return {"answer": "visitor_id is empty ", "error": True, "error_code": 500}
+    profile_id = REDIS_CLIENT.hget(visitor_id, 'profile_id')
+    if profile_id is None or len(profile_id) == 0: 
+        if LEOBOT_DEV_MODE : 
+            return {"answer": "local_dev", "error_code": 0}
+        else:
+            return {"answer": "Not found any profile in CDP", "error": True, "error_code": 404}
+    name = str(REDIS_CLIENT.hget(visitor_id, 'name'))
+    return {"answer": name, "error_code": 0}
 
 
 @leobot.get("/ask", response_class=PlainTextResponse)
-async def ask(question: str = Query(..., min_length=1)):
-    try:
-        rs =  ask_question(question=question)
-        return {"response": rs}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@leobot.post("/ask", response_class=JSONResponse)
+async def ask(msg: Message):
+    visitor_id = msg.visitor_id
+    if len(visitor_id) == 0: 
+        return {"answer": "visitor_id is empty ", "error": True, "error_code": 500}
+    
+    if LEOBOT_DEV_MODE:
+        profile_id = "0"
+    else:
+        profile_id = REDIS_CLIENT.hget(visitor_id, 'profile_id')
+        if profile_id is None or len(profile_id) == 0: 
+            return {"answer": "Not found any profile in CDP", "error": True, "error_code": 404}
+    
+    leobot_ready = is_visitor_ready(visitor_id)
+    question = msg.question
+    prompt = msg.prompt
+    lang_of_question = msg.answer_in_language
+    context = msg.context
+       
+    if len(question) > 1000 or len(prompt) > 1000 :
+        return {"answer": "Question must be less than 1000 characters!", "error": True, "error_code": 510}
+
+    print("context: "+context)
+    print("question: "+question)
+    print("prompt: "+prompt)
+    print("visitor_id: " + visitor_id)
+    print("profile_id: "+profile_id)
+
+    if leobot_ready:            
+        # translate if need
+        answer = ask_question(question=msg.question, context=msg.context)
+        print("answer " + answer)
+        data = {"question": question, "answer": answer, "visitor_id": visitor_id, "error_code": 0}
+    else:
+        data = {"answer": "Your profile is banned due to Violation of Terms", "error": True, "error_code": 666}
+    return data
     
     
 # The main function to ask LEO
@@ -144,13 +206,15 @@ def ask_question(question: str = 'Hi', context: str = '', temperature_score: flo
         )
     
 
-# AWS Lambda handler
-# handler = Mangum(leobot)
-
-
-# Example usage:
-if __name__ == '__main__':
-     # Ensure your API key is configured before calling the function.
+if is_running_in_aws_lambda():
+    print("✅ This code is running inside an AWS Lambda function.")
+    # AWS Lambda handler
+    handler = Mangum(leobot)
+else: 
+    print("❌ This code is running in a local or non-Lambda environment.")
+    # Example usage:
+    
+    # Ensure your API key is configured before calling the function.
     # genai.configure(api_key="YOUR_GOOGLE_API_KEY")
-    answer = ask_question(question="What is the capital of France?", context="You are chatbot in Vietnam, please answer in Vietnamese")
+    answer = ask_question(question="What is the capital of Vietnam?", context="You are chatbot in Vietnam, please answer in Vietnamese")
     print(answer)

@@ -214,7 +214,7 @@ var sendQuestionToLeoAI = function (context, question) {
       payload["visitor_id"] = currentUserProfile.visitorId;
       payload["answer_in_language"] = $("#leobot_answer_in_language").val();
       payload["answer_in_format"] = "html";
-      payload["context"] = "I am a smart chatbot with AI capabilities.";
+      payload["context"] = "You are chatbot in Vietnam, please answer in Vietnamese";
       callPostApi(BASE_URL_LEOBOT, payload, serverCallback);
     };
     showChatBotLoader().then(callServer);
