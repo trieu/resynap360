@@ -1,0 +1,24 @@
+# Core application dependencies for running on AWS Lambda
+
+# FastAPI framework & Lambda adapter
+fastapi
+mangum
+
+# Database drivers
+# The application code uses asyncpg for non-blocking database calls
+aws-psycopg2==1.3.8
+
+# Python client for handling the pgvector custom type
+pgvector
+
+# AI Services
+# Client for Google's Generative AI models.
+# This is a good candidate to place in a Lambda Layer.
+google-genai==1.21.0
+
+python-dateutil==2.9.0.post0
+python-dotenv==1.1.0
+
+typing_extensions==4.13.2
+urllib3==2.4.0
+Unidecode==1.4.0
