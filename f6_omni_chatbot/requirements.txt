@@ -15,6 +15,7 @@ pgvector
 # Client for Google's Generative AI models.
 # This is a good candidate to place in a Lambda Layer.
 google-genai==1.21.0
+sentence_transformers
 
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.0
